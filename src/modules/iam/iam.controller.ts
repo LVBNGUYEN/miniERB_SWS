@@ -1,4 +1,6 @@
 import { Controller, Post, Body, Get, UseGuards, Param } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { IamService } from './iam.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
@@ -11,6 +13,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { OwnershipGuard } from './guards/ownership.guard';
 import { RequireOwnership } from './decorators/require-ownership.decorator';
 
+@ApiTags('IAM')
 @Controller('iam')
 export class IamController {
   constructor(private readonly iamService: IamService) {}
@@ -32,6 +35,7 @@ export class IamController {
   }
 
   // ── Logout (protected — requires valid access token) ──
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('auth/logout')
   async logout(@CurrentUser() user: any) {
@@ -49,6 +53,7 @@ export class IamController {
   }
 
   // Protected route — any authenticated user
+  @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@CurrentUser() user: any) {
@@ -56,6 +61,7 @@ export class IamController {
   }
 
   // Protected route — Role Based Access Control (RBAC)
+  @ApiBearerAuth()
   @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get('admin-board')

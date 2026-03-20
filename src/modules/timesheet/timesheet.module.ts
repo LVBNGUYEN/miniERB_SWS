@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Timesheet } from './entities/timesheet.entity';
+import { TimesheetService } from './timesheet.service';
+import { TimesheetController } from './timesheet.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Timesheet])],
-  providers: [],
-  exports: [TypeOrmModule],
+  controllers: [TimesheetController],
+  providers: [TimesheetService],
+  exports: [TimesheetService],
 })
 export class TimesheetModule {}

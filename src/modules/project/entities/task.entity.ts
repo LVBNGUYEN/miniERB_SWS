@@ -33,4 +33,7 @@ export class Task extends AbstractEntity {
 
   @Column({ name: 'rejection_count', type: 'int', default: 0 })
   rejectionCount: number;
+
+  @Column({ name: 'actual_hours', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  actualHours: number;
 }
