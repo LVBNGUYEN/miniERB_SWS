@@ -8,13 +8,14 @@ import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { OwnershipValidator } from './interfaces/ownership-validator.interface';
 import * as bcrypt from 'bcrypt';
 
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key';
 const REFRESH_TOKEN_EXPIRY = '7d';
 
 @Injectable()
-export class IamService {
+export class IamService implements OwnershipValidator {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -204,5 +205,14 @@ export class IamService {
     }
     const { passwordHash, refreshTokenHash, ...result } = user;
     return result;
+  }
+
+  // ──────────────────────────────────────────────
+  //  Ownership Validation Demo
+  // ──────────────────────────────────────────────
+  async verifyOwnership(resourceId: string, userId: string, branchId?: string): Promise<boolean> {
+    // For this demo: a user "owns" their own user resource.
+    // In a real project, this would check if (project.createdBy === userId) etc.
+    return resourceId === userId;
   }
 }

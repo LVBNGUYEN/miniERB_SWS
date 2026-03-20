@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Param } from '@nestjs/common';
 import { IamService } from './iam.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
@@ -8,6 +8,8 @@ import { RolesGuard } from './guards/roles.guard';
 import { Roles } from './decorators/roles.decorator';
 import { Role } from './entities/role.enum';
 import { CurrentUser } from './decorators/current-user.decorator';
+import { OwnershipGuard } from './guards/ownership.guard';
+import { RequireOwnership } from './decorators/require-ownership.decorator';
 
 @Controller('iam')
 export class IamController {
@@ -59,5 +61,15 @@ export class IamController {
   @Get('admin-board')
   getAdminBoard() {
     return { message: 'Welcome to the admin board' };
+  }
+
+  // ── IDOR Test Endpoint ──
+  // Any user can try to access this, but OwnershipGuard will block them 
+  // if they try to access an ID that isn't their own.
+  @UseGuards(JwtAuthGuard, OwnershipGuard)
+  @RequireOwnership(IamService)
+  @Get('user/:id')
+  async getUserById(@Param('id') id: string) {
+    return this.iamService.getProfile(id);
   }
 }

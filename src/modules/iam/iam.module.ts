@@ -9,6 +9,7 @@ import { User } from './entities/user.entity';
 import { AuthCredential } from './entities/auth-credential.entity';
 import { Branch } from '../system/entities/branch.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { OwnershipGuard } from './guards/ownership.guard';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [IamController],
-  providers: [IamService, JwtStrategy],
-  exports: [IamService, JwtModule, PassportModule],
+  providers: [IamService, JwtStrategy, OwnershipGuard],
+  exports: [IamService, JwtModule, PassportModule, OwnershipGuard],
 })
 export class IamModule {}
