@@ -28,3 +28,8 @@ design-artifacts/
 .DS_Store
 Thumbs.db
 
+
+# Test configuration and files
+jest.config.js
+coverage/
+**/*.spec.ts
