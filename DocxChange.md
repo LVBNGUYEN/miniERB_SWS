@@ -1,77 +1,60 @@
-# Báo cáo Chi tiết Thay đổi & Tính năng (DocxChange.md)
-**Cập nhật lần 2: Nhánh Nguyen** (So với nhánh `main`)
+# Báo cáo Phân tích Kỹ thuật & Luồng Dữ liệu (DocxChange.md)
+**Cập nhật lần 3: Nhánh Nguyen** (So với nhánh `main`)
 
-Báo cáo này liệt kê chi tiết các hiện thực hóa kỹ thuật và trải nghiệm người dùng đã được phát triển trong nhánh **Nguyen**.
-
----
-
-## 1. AMIT AI Copilot: Hệ thống Trợ lý Chiến lược
-Hệ thống này đã được hiện thực hóa từ giao diện tĩnh thành một bộ máy phân tích dữ liệu động:
-
-### 🔹 Backend AI Engine (`src/modules/ai-engine`)
-- **Controller & Service**: Tạo API Endpoint `/ai-engine/chat` được bảo vệ bởi **JwtAuthGuard** và phân quyền **RolesGuard**.
-- **Mocked Intelligent Engine**: AI có khả năng phân tích chuỗi văn bản và trả về thông tin chuyên sâu:
-    - **Tài chính**: Trả về dữ liệu dòng tiền (3.2 tỷ VND), tăng trưởng (8.1%) và rủi ro chi phí R&D.
-    - **Tiến độ Dự án**: Tự động tính toán ngày hoàn thành dựa trên khối lượng công việc (hiện tại là 72.5%).
-    - **Nhật Bản & Nguồn lực**: Đề xuất luân chuyển 3 kỹ sư từ VN sang Tokyo cho quy trình Go-live.
-    - **Nhân sự**: Cảnh báo tình trạng "Overclock" (quá tải) của đội kỹ thuật (vượt 15%).
-
-### 🔹 Frontend Interface (`AICopilotDashboard.tsx`)
-- **Chat Interactivity**: Người dùng có thể nhập lệnh chat hoặc nhấn vào các nút gợi ý có sẵn.
-- **Scrolling logic**: Sử dụng `useRef` và `useEffect` để màn hình tự động trượt xuống khi AI trả lời.
-- **Typing Indicator**: Hiển thị trạng thái phân tích dữ liệu thực tế giúp tăng trải nghiệm người dùng.
+Báo cáo này tập trung vào cấu trúc API, Logic nghiệp vụ và Luồng dữ liệu xuyên suốt từ Database lên giao diện người dùng (UI/UX).
 
 ---
 
-## 2. Luồng Khởi tạo Dự án theo Vai trò (Role-Based Project Creation)
-Điều chỉnh quy trình từ phía Sale đến PM để đảm bảo tính nhất quán của dữ liệu:
+## 1. Luồng Dữ liệu Hệ thống (End-to-End Data Flow)
+Toàn bộ dữ liệu trong nhánh **Nguyen** được thiết kế để đi theo luồng khép kín:
 
-- **Sale & Admin (CEO)**: 
-    - Giữ quyền tạo mới dự án từ đầu (Project creation source). 
-    - Modal hiển thị đầy đủ các trường: Tên dự án, Khách hàng, Xác suất, Chủ nhiệm dự án và Giờ dự kiến.
-- **Project Manager (PM)**:
-    - **Nút bấm**: Chuyển nhãn nút từ "Dự án mới" thành **"Khởi tạo thông số"**.
-    - **Quy trình**: PM chỉ được phép chọn các dự án đã được Sale khởi tạo (Dropdown chọn dự án có sẵn).
-    - **Giới hạn trường**: Ẩn các trường không thuộc trách nhiệm của PM như **Xác suất (%)** và **Chọn PM** (vì họ chính là PM). 
-    - **Trọng tâm**: Chỉ tập trung vào việc ước lượng **Giờ dự kiến**.
-
----
-
-## 3. Hệ thống Cảnh báo Ngân sách Nhân sự
-Tích hợp quy trình giám sát chi phí nhân sự thông minh:
-
-- **Cơ chế Tự động (80% threshold)**:
-    - Backend tự động tính toán tỷ lệ `Giờ chấm công / Giờ dự kiến`.
-    - Khi đạt ngưỡng 80%, hệ thống tự tạo một bản ghi `SysAlert` và gỡ tag `isAlerted80` trong database để thông báo cho PM.
-- **Cơ chế Thủ công (Manual Alert)**:
-    - **Executive Dashboard**: Sale/CEO khi xem danh sách dự án, nếu di chuột qua tên dự án sẽ hiện nút **"Cảnh báo PM"** (Triangle Icon).
-    - Khi nhấn nút, hệ thống sẽ gọi API `/alerts/:projectId/manual-alert` để gửi thông báo trực tiếp đến PM của dự án đó.
-- **Giao diện**: Dự án có rủi ro sẽ hiển thị label **"Auto: Ngân sách > 80%"** màu đỏ ngay cạnh tên dự án.
+### 🔄 Luồng truy xuất:
+1.  **Database Layer (SQLite/PostgreSQL)**: Dữ liệu thực thể (User, Project, Task, Timesheet) được lưu trữ bền vững.
+2.  **Entity Layer (TypeORM)**: Định nghĩa cấu trúc bảng thông qua `AbstractEntity`. Cơ chế **Soft Delete** tự động ẩn các bản ghi có `deletedAt != null`.
+3.  **Repository Layer**: Sử dụng `TypeORM Repository` để thực hiện các truy vấn SQL phức tạp (Join, Filter, Order).
+4.  **Service Layer (Business Logic)**: Xử lý nghiệp vụ (ví dụ: Tính toán % ngân sách vượt ngưỡng, lọc PM cho dự án).
+5.  **Controller Layer (REST API)**: Xuất dữ liệu qua JSON. Bảo mật bằng `@UseGuards(JwtAuthGuard, RolesGuard)`.
+6.  **Frontend API Utils (`api/index.ts`)**: Sử dụng `fetch` bọc trong các hàm `post`, `get`, `patch` để đính kèm Token bảo mật tự động.
+7.  **React State (UI Layer)**: Dữ liệu được `fetch` và lưu vào `useState`. Các Component (`FinanceDashboard`, `ProjectDashboard`) sẽ Mapping dữ liệu này lên UI.
 
 ---
 
-## 4. Tùy biến Dashboard Chấm công cho PM
-Đáp ứng yêu cầu nghiêm ngặt về thuật ngữ và quyền quản trị:
+## 2. API Logic & Hiện thực hóa Kỹ thuật
+Bổ sung các logic xử lý thông minh tại Backend:
 
-- **Loại bỏ "Rà soát ngay"**: Trong Dashboard Chấm công của PM, nút nút "Rà soát ngay" màu trắng đã được gỡ bỏ hoàn toàn.
-- **Softened Message**: Thay đổi câu văn cảnh báo đỏ từ "Cần rà soát ngay..." thành **"Cần theo dõi sát sao các hoạt động chấm công..."** để phù hợp hơn với vị thế của PM khi xem dữ liệu riêng tư.
+### 🧠 Logic AI Engine API (`/ai-engine/chat`)
+- **Input Phân tích**: Nhận `query` từ người dùng.
+- **Logic Phân loại**: Service sử dụng Regex mapping để phân loại yêu cầu (Finance, Project, Resource).
+- **Trích xuất dữ liệu**: Mẫu dữ liệu trả về không chỉ là văn bản mà còn là **Layout định dạng** (ví dụ: `finance` layout để hiển thị bảng số liệu tài chính chuyên sâu).
 
----
-
-## 5. Chính sách Toàn vẹn Dữ liệu (Soft Delete)
-Đảm bảo an toàn dữ liệu tập đoàn:
-
-- **Cấm Hard Delete**: Toàn bộ codebase đã được kiểm duyệt, không có lệnh `DELETE`.
-- **AbstractBase**: Sử dụng `AbstractEntity` làm gốc cho 100% Entities, tích hợp sẵn `@DeleteDateColumn` (deletedAt).
-- **Query Filter**: Hệ thống tự động lọc bỏ các dữ liệu có `deletedAt` khi truy vấn (nhờ cơ chế Soft Delete của TypeORM).
+### 🔔 Manual Alert API (`/alerts/:projectId/manual-alert`)
+- **Nghiệp vụ**: Khi Sale/CEO nhấn nút "Cảnh báo", Controller sẽ nhận `projectId`, ghi nhận vào bảng `sys_alerts` và đánh dấu dự án đó đang trong tình trạng cần chú ý.
+- **Push Notification**: Trạng thái này được đồng bộ để khi PM đăng nhập, họ sẽ thấy cảnh báo đỏ ngay trên Dashboard cá nhân.
 
 ---
 
-## 6. Git & Cấu trúc Mã nguồn
-- **Ngăn chặn rò rỉ mã nguồn**: Loại bỏ thư mục `test/` (E2E tests) khỏi remote repository nhánh `Nguyen`.
-- **Gitignore tối ưu**: Bổ sung chặn các thư mục build (`dist`), thư viện (`node_modules`) ở mọi cấp độ thư mục.
-- **Build Clean**: Đã sửa lỗi logic trong spec file để hệ thống backend có thể biên dịch 100% không lỗi.
+## 3. Thay đổi UI/UX & Tương tác Người dùng
+Các cải tiến giúp giao diện trở nên "sống" và chuyên nghiệp hơn:
+
+### 🎨 Chuyển đổi từ Tĩnh sang Động
+- **Dashboard Tài chính/Dự án**: Thay thế dữ liệu Mock cứng bằng việc gọi `api.post('/projects/list', {})`. Dữ liệu về `totalAmount`, `estimatedHours` được lấy trực tiếp từ bảng `prj_projects`.
+- **Dynamic Project Creation Modal**: 
+    - **Logic hiển thị**: Sử dụng `role = getCookie('user_role')` để ẩn các field nhạy cảm (`probability`, `assignPM`).
+    - **Logic Mapping**: Danh sách Dự án trong Dropdown được lấy từ `API listProjects` thay vì nhập tay.
+
+### ⚡ React Interaction
+- **Auto-scroll Logic**: Trong AI Copilot, khi tin nhắn mới được thêm vào mảng `messages`, `useEffect` sẽ kích hoạt `scrollIntoView({ behavior: 'smooth' })` để trải nghiệm mượt mà.
+- **Role-based Styling**: Sử dụng màu sắc và icon khác nhau cho từng loại tin nhắn (User vs AI) và từng loại Cảnh báo (Auto vs Manual).
 
 ---
-**Nhóm phát triển:** Antigravity AI Engine  
-**Cập nhật lần cuối:** 23/03/2026
+
+## 4. Bảo mật & Tính toàn vẹn
+- **JWT Encryption**: Toàn bộ API đều yêu cầu Access Token hợp lệ.
+- **Soft Delete Enforcement**:
+    - **Logic**: Khi "xóa", hệ thống thực hiện `repository.softDelete(id)`. 
+    - **Kết quả**: Bản ghi vẫn tồn tại trong DB cho mục đích đối soát nhưng biến mất hoàn toàn trên UI người dùng.
+- **Vite Proxy Tunneling**: Đồng bộ hóa cổng `5173` (Vite) và `3000` (NestJS) để giải quyết lỗi CORS (Cross-Origin Resource Sharing).
+
+---
+**Chịu trách nhiệm:** Antigravity AI Engine (Google Deepmind Team)  
+**Phiên bản Báo cáo:** 1.2 (Chi tiết Kỹ thuật)
