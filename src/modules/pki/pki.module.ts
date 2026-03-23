@@ -1,10 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DigitalSignature } from './entities/digital-signature.entity';
+import { PkiService } from './services/pki.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DigitalSignature])],
-  providers: [],
-  exports: [TypeOrmModule],
+  providers: [PkiService],
+  exports: [PkiService],
 })
 export class PkiModule {}

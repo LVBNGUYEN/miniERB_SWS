@@ -215,4 +215,19 @@ export class IamService implements OwnershipValidator {
     // In a real project, this would check if (project.createdBy === userId) etc.
     return resourceId === userId;
   }
+
+  async findAllUsers() {
+    return this.userRepository.find({
+      select: ['id', 'email', 'fullName', 'role'],
+      order: { fullName: 'ASC' }
+    });
+  }
+
+  async findPms() {
+    return this.userRepository.find({
+      where: { role: 'BRANCH_PM' },
+      select: ['id', 'email', 'fullName'],
+      order: { fullName: 'ASC' }
+    });
+  }
 }

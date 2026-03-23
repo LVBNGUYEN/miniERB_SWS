@@ -18,6 +18,7 @@
     "forceConsistentCasingInFileNames": false,
     "resolveJsonModule": true
   },
+  "exclude": ["node_modules", "dist", "src/modules/uiux"],
   "watchOptions": {
     "fallbackPolling": "dynamicPriority"
   }

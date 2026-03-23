@@ -1,11 +1,23 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Quotation } from './entities/quotation.entity';
 import { Contract } from './entities/contract.entity';
+import { Quotation } from './entities/quotation.entity';
+import { ContractService } from './services/contract.service';
+import { PkiModule } from '../pki/pki.module';
+import { ProjectModule } from '../project/project.module';
+import { SalesController } from './controllers/sales.controller';
+import { SysAuditModule } from '../sys-audit/sys-audit.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Quotation, Contract])],
-  providers: [],
-  exports: [TypeOrmModule],
+  imports: [
+    TypeOrmModule.forFeature([Contract, Quotation]),
+    PkiModule,
+    ProjectModule,
+    SysAuditModule
+  ],
+  controllers: [SalesController],
+  providers: [ContractService],
+  exports: [ContractService],
 })
 export class SalesModule {}
+

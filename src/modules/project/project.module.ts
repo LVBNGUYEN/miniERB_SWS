@@ -1,18 +1,22 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { IamModule } from '../iam/iam.module';
 import { Project } from './entities/project.entity';
 import { Task } from './entities/task.entity';
-import { Baseline } from './entities/baseline.entity';
-import { ProjectMember } from './entities/project-member.entity';
+import { TaskRequest } from './entities/task-request.entity';
+import { ProjectService } from './services/project.service';
+import { TaskService } from './services/task.service';
+import { TaskRequestService } from './services/task-request.service';
+import { ProjectController } from './controllers/project.controller';
+import { TaskRequestController } from './controllers/task-request.controller';
+import { SysAuditModule } from '../sys-audit/sys-audit.module';
 
 @Module({
   imports: [
-    IamModule,
-    TypeOrmModule.forFeature([Project, Task, Baseline, ProjectMember]),
+    TypeOrmModule.forFeature([Project, Task, TaskRequest]),
+    SysAuditModule // Needed for AuditInterceptor
   ],
-  controllers: [],
-  providers: [],
-  exports: [],
+  controllers: [ProjectController, TaskRequestController],
+  providers: [ProjectService, TaskService, TaskRequestService],
+  exports: [ProjectService, TaskService, TaskRequestService],
 })
 export class ProjectModule {}
