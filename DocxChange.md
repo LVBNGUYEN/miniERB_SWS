@@ -1,39 +1,77 @@
-# Báo cáo Thay đổi Dự án (DocxChange.md)
-**Nhánh: Nguyen** (So với nhánh `main`)
+# Báo cáo Chi tiết Thay đổi & Tính năng (DocxChange.md)
+**Cập nhật lần 2: Nhánh Nguyen** (So với nhánh `main`)
 
-Báo cáo này liệt kê các thay đổi quan trọng và tính năng mới đã được hiện thực hóa trong nhánh **Nguyen**.
-
-## 1. Hệ thống AI Copilot & AI Engine
-- **Backend AI Engine**: Xây dựng module `ai-engine` hoàn chỉnh với `Controller`, `Service` và `Module`.
-- **Cơ chế suy luận**: Hiện thực hóa bộ máy phân tích dữ liệu giả lập cho phép AI hiểu về sức khỏe tài chính tập đoàn, tiến độ dự án SkyLine ERP và đề xuất nguồn lực Nhật Bản.
-- **Giao diện Chat**: Hoàn thiện UI/UX của AMIT AI Copilot với tính năng chat tương tác thời gian thực, tự động cuộn (auto-scroll) và trạng thái đang phân tích (typing state).
-- **Vite Proxy**: Cấu hình proxy cho phép Frontend kết nối thông suốt với Backend AI Engine (`/ai-engine/chat`).
-
-## 2. Quản lý Dự án & Phân quyền (Role-Based Access)
-- **Luồng khởi tạo dự án**: 
-    - Giới hạn quyền tạo dự án mới cho **Sale và Admin (CEO)**.
-    - **Project Manager (PM)**: Chỉ được phép chọn dự án có sẵn và khởi tạo thông số (Giờ dự kiến), không được thay đổi xác suất hay tạo dự án mới từ đầu.
-- **Tùy biến Modal**: Tự động thay đổi các trường dữ liệu hiển thị dựa trên vai trò người dùng (PM vs Sale/Admin).
-
-## 3. Hệ thống Cảnh báo Ngân sách (Budget Alerting)
-- **Cảnh báo tự động**: Hệ thống tự động đẩy thông báo PM khi dự án vượt ngưỡng 80% ngân sách nhân sự.
-- **Cảnh báo thủ công**: Cung cấp tính năng cho Sale/CEO nhấn nút "Cảnh báo PM" thủ công trực tiếp từ Executive Dashboard.
-- **Cập nhật Dashboard**: Hiển thị nhãn "Auto: Ngân sách > 80%" trên danh sách dự án khi có rủi ro trượt ngân sách.
-
-## 4. Cải tiến UI/UX Timesheet
-- **PM Interface**: Loại bỏ nút "Rà soát ngay" đối với vai trò PM trong Dashboard Chấm công theo yêu cầu (nghiêm cấm chữ rà soát ngay xuất hiện ở PM).
-- **Thông điệp thông minh**: Chuyển nội dung cảnh báo từ dạng "nhắc nhở rà soát" sang dạng "theo dõi sát sao" đối với PM.
-
-## 5. Kiến trúc & Bảo mật
-- **Soft Delete Policy**: Đảm bảo toàn bộ dự án tuân thủ nghiêm ngặt chính sách xóa mềm. Không sử dụng `hard delete`, sử dụng `@DeleteDateColumn` thông qua `AbstractEntity`.
-- **Git & GitHub**: 
-    - Cấu hình `.gitignore` chuẩn hóa để loại bỏ `node_modules`, `dist` và các file rác.
-    - Gỡ bỏ hoàn toàn thư mục `test/` khỏi bộ chỉ mục Git (`git rm --cached`) để bảo mật mã nguồn kiểm thử nội bộ.
-
-## 6. Sửa lỗi & Đảm bảo Ổn định
-- **Fix Build**: Sửa các lỗi Lint liên quan đến `Role.USER` trong file `iam.controller.spec.ts` để dự án có thể build thành công.
-- **Proxy Sync**: Cập nhật `vite.config.ts` để đồng bộ toàn bộ các cổng API.
+Báo cáo này liệt kê chi tiết các hiện thực hóa kỹ thuật và trải nghiệm người dùng đã được phát triển trong nhánh **Nguyen**.
 
 ---
-**Người thực hiện:** Antigravity (Google Assistant)  
-**Ngày cập nhật:** 23/03/2026
+
+## 1. AMIT AI Copilot: Hệ thống Trợ lý Chiến lược
+Hệ thống này đã được hiện thực hóa từ giao diện tĩnh thành một bộ máy phân tích dữ liệu động:
+
+### 🔹 Backend AI Engine (`src/modules/ai-engine`)
+- **Controller & Service**: Tạo API Endpoint `/ai-engine/chat` được bảo vệ bởi **JwtAuthGuard** và phân quyền **RolesGuard**.
+- **Mocked Intelligent Engine**: AI có khả năng phân tích chuỗi văn bản và trả về thông tin chuyên sâu:
+    - **Tài chính**: Trả về dữ liệu dòng tiền (3.2 tỷ VND), tăng trưởng (8.1%) và rủi ro chi phí R&D.
+    - **Tiến độ Dự án**: Tự động tính toán ngày hoàn thành dựa trên khối lượng công việc (hiện tại là 72.5%).
+    - **Nhật Bản & Nguồn lực**: Đề xuất luân chuyển 3 kỹ sư từ VN sang Tokyo cho quy trình Go-live.
+    - **Nhân sự**: Cảnh báo tình trạng "Overclock" (quá tải) của đội kỹ thuật (vượt 15%).
+
+### 🔹 Frontend Interface (`AICopilotDashboard.tsx`)
+- **Chat Interactivity**: Người dùng có thể nhập lệnh chat hoặc nhấn vào các nút gợi ý có sẵn.
+- **Scrolling logic**: Sử dụng `useRef` và `useEffect` để màn hình tự động trượt xuống khi AI trả lời.
+- **Typing Indicator**: Hiển thị trạng thái phân tích dữ liệu thực tế giúp tăng trải nghiệm người dùng.
+
+---
+
+## 2. Luồng Khởi tạo Dự án theo Vai trò (Role-Based Project Creation)
+Điều chỉnh quy trình từ phía Sale đến PM để đảm bảo tính nhất quán của dữ liệu:
+
+- **Sale & Admin (CEO)**: 
+    - Giữ quyền tạo mới dự án từ đầu (Project creation source). 
+    - Modal hiển thị đầy đủ các trường: Tên dự án, Khách hàng, Xác suất, Chủ nhiệm dự án và Giờ dự kiến.
+- **Project Manager (PM)**:
+    - **Nút bấm**: Chuyển nhãn nút từ "Dự án mới" thành **"Khởi tạo thông số"**.
+    - **Quy trình**: PM chỉ được phép chọn các dự án đã được Sale khởi tạo (Dropdown chọn dự án có sẵn).
+    - **Giới hạn trường**: Ẩn các trường không thuộc trách nhiệm của PM như **Xác suất (%)** và **Chọn PM** (vì họ chính là PM). 
+    - **Trọng tâm**: Chỉ tập trung vào việc ước lượng **Giờ dự kiến**.
+
+---
+
+## 3. Hệ thống Cảnh báo Ngân sách Nhân sự
+Tích hợp quy trình giám sát chi phí nhân sự thông minh:
+
+- **Cơ chế Tự động (80% threshold)**:
+    - Backend tự động tính toán tỷ lệ `Giờ chấm công / Giờ dự kiến`.
+    - Khi đạt ngưỡng 80%, hệ thống tự tạo một bản ghi `SysAlert` và gỡ tag `isAlerted80` trong database để thông báo cho PM.
+- **Cơ chế Thủ công (Manual Alert)**:
+    - **Executive Dashboard**: Sale/CEO khi xem danh sách dự án, nếu di chuột qua tên dự án sẽ hiện nút **"Cảnh báo PM"** (Triangle Icon).
+    - Khi nhấn nút, hệ thống sẽ gọi API `/alerts/:projectId/manual-alert` để gửi thông báo trực tiếp đến PM của dự án đó.
+- **Giao diện**: Dự án có rủi ro sẽ hiển thị label **"Auto: Ngân sách > 80%"** màu đỏ ngay cạnh tên dự án.
+
+---
+
+## 4. Tùy biến Dashboard Chấm công cho PM
+Đáp ứng yêu cầu nghiêm ngặt về thuật ngữ và quyền quản trị:
+
+- **Loại bỏ "Rà soát ngay"**: Trong Dashboard Chấm công của PM, nút nút "Rà soát ngay" màu trắng đã được gỡ bỏ hoàn toàn.
+- **Softened Message**: Thay đổi câu văn cảnh báo đỏ từ "Cần rà soát ngay..." thành **"Cần theo dõi sát sao các hoạt động chấm công..."** để phù hợp hơn với vị thế của PM khi xem dữ liệu riêng tư.
+
+---
+
+## 5. Chính sách Toàn vẹn Dữ liệu (Soft Delete)
+Đảm bảo an toàn dữ liệu tập đoàn:
+
+- **Cấm Hard Delete**: Toàn bộ codebase đã được kiểm duyệt, không có lệnh `DELETE`.
+- **AbstractBase**: Sử dụng `AbstractEntity` làm gốc cho 100% Entities, tích hợp sẵn `@DeleteDateColumn` (deletedAt).
+- **Query Filter**: Hệ thống tự động lọc bỏ các dữ liệu có `deletedAt` khi truy vấn (nhờ cơ chế Soft Delete của TypeORM).
+
+---
+
+## 6. Git & Cấu trúc Mã nguồn
+- **Ngăn chặn rò rỉ mã nguồn**: Loại bỏ thư mục `test/` (E2E tests) khỏi remote repository nhánh `Nguyen`.
+- **Gitignore tối ưu**: Bổ sung chặn các thư mục build (`dist`), thư viện (`node_modules`) ở mọi cấp độ thư mục.
+- **Build Clean**: Đã sửa lỗi logic trong spec file để hệ thống backend có thể biên dịch 100% không lỗi.
+
+---
+**Nhóm phát triển:** Antigravity AI Engine  
+**Cập nhật lần cuối:** 23/03/2026
