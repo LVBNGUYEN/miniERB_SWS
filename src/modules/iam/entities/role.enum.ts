@@ -3,5 +3,5 @@ export enum Role {
   BRANCH_PM = 'BRANCH_PM',
   VENDOR = 'VENDOR',
   CLIENT = 'CLIENT',
-  USER = 'USER',
+  SALE = 'SALE',
 }

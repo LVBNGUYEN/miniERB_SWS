@@ -78,4 +78,12 @@ export class IamController {
   async getUserById(@Param('id') id: string) {
     return this.iamService.getProfile(id);
   }
+
+  @ApiBearerAuth()
+  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.SALE)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('pm-list')
+  async listPms() {
+    return this.iamService.findPms();
+  }
 }
