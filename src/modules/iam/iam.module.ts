@@ -11,14 +11,15 @@ import { SecuritySetting } from './entities/security-setting.entity';
 import { Branch } from '../system/entities/branch.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { OwnershipGuard } from './guards/ownership.guard';
+import { SysAuditModule } from '../sys-audit/sys-audit.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthCredential, SecuritySetting, Branch]),
+    TypeOrmModule.forFeature([User, AuthCredential, Branch]),
     PassportModule,
     JwtModule.register({
       // In a real configuration, use ConfigModule to pull secret from .env
-      secret: process.env.JWT_SECRET || 'super-secret-key', 
+      secret: process.env.JWT_SECRET || 'super-secret-key',
       signOptions: { expiresIn: '15m' },
     }),
   ],
@@ -26,4 +27,4 @@ import { OwnershipGuard } from './guards/ownership.guard';
   providers: [IamService, JwtStrategy, OwnershipGuard],
   exports: [IamService, JwtModule, PassportModule, OwnershipGuard],
 })
-export class IamModule {}
+export class IamModule { }

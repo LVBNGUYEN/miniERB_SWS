@@ -26,6 +26,9 @@ export class User extends AbstractEntity {
   @Column({ name: 'hourly_rate', type: 'decimal', precision: 10, scale: 2, nullable: true })
   hourlyRate: number;
 
+  @Column({ name: 'skills', type: 'simple-array', nullable: true })
+  skills: string[];
+
   @Column({ name: 'actor_type', length: 20, default: 'HUMAN' })
   actorType: string;
 
@@ -34,4 +37,13 @@ export class User extends AbstractEntity {
 
   @Column({ name: 'refresh_token_hash', type: 'varchar', length: 255, nullable: true })
   refreshTokenHash: string | null;
+
+  @Column({ name: 'login_attempts', type: 'int', default: 0 })
+  loginAttempts: number;
+
+  @Column({ name: 'locked_until', type: 'timestamptz', nullable: true })
+  lockedUntil: Date | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  scorecard: Record<string, any> | null;
 }

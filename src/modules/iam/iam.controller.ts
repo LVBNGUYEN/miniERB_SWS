@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IamService } from './iam.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
+import { CreateVendorDto } from './dto/create-vendor.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -19,7 +20,7 @@ import { AuditInterceptor } from '../sys-audit/interceptors/audit.interceptor';
 @UseInterceptors(AuditInterceptor)
 @Controller('iam')
 export class IamController {
-  constructor(private readonly iamService: IamService) {}
+  constructor(private readonly iamService: IamService) { }
 
   @Audit('iam_users', 'CREATE_USER')
   @Post('sign-up')
@@ -30,6 +31,15 @@ export class IamController {
   @Post('sign-in')
   async signIn(@Body() signInDto: SignInDto) {
     return this.iamService.signIn(signInDto);
+  }
+
+  // ── Create Vendor (Admin Only) ──
+  @ApiBearerAuth()
+  @Roles(Role.GLOBAL_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post('vendor')
+  async createVendor(@CurrentUser() user: any, @Body() createVendorDto: CreateVendorDto) {
+    return this.iamService.createVendor(user.userId, createVendorDto);
   }
 
   // ── Refresh Token (public) ──
