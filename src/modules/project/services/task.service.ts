@@ -59,4 +59,11 @@ export class TaskService {
       order: { createdAt: 'ASC' }
     });
   }
+
+  async findByAssignee(assigneeId: string): Promise<Task[]> {
+    return this.taskRepository.find({
+      where: { assigneeId },
+      order: { createdAt: 'DESC' }
+    });
+  }
 }

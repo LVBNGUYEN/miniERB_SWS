@@ -15,7 +15,10 @@ import {
   Check,
   Loader2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  FileText,
+  Key,
+  Inbox
 } from 'lucide-react';
 import { Role } from '../../../../iam/entities/role.enum';
 import Modal from '../../components/Modal';
@@ -29,7 +32,7 @@ interface ExecutiveDashboardProps {
 }
 
 const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role, projects: initialProjects, alerts: initialAlerts }) => {
-  const [modals, setModals] = useState({ export: false, ai: false, newProject: false });
+  const [modals, setModals] = useState({ export: false, ai: false, newProject: false, pki: false, contract: false, evalTicket: false });
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,17 +54,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-        
         // Projects
-        const res = await fetch('/api/projects/list', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await res.json();
+        const data = await api.post('/projects/list', {});
         if (Array.isArray(data)) {
           const mapped = data.map((p: any) => ({
             name: p.name,
@@ -75,11 +69,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
         }
 
         // PMs
-        const pmRes = await fetch('/api/iam/pm-list', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (pmRes.ok) {
-          const pmData = await pmRes.json();
+        const pmData = await api.get('/iam/pm-list');
+        if (Array.isArray(pmData)) {
           setPms(pmData);
         }
 
@@ -119,27 +110,27 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
     e.preventDefault();
     setIsSubmitting(true);
     
-    // In a real app, we would POST to /api/projects
-    setTimeout(() => {
-      const newEntry = {
+    try {
+      await api.post('/projects/create', {
         name: newProjName,
-        status: '5%',
-        color: 'bg-status-yellow',
-        value: parseInt(newProjValue) || 100000000,
-        estimatedHours: 40 // Default for new proj
-      };
+        totalAmount: parseInt(newProjValue) || 100000000,
+        status: 'INIT'
+      });
       
-      setLocalProjects([newEntry, ...localProjects]);
-      setIsSubmitting(false);
       setIsSuccess(true);
-      
       setTimeout(() => {
         setModals({...modals, newProject: false});
         setIsSuccess(false);
         setNewProjName('');
         setNewProjValue('');
+        // Refresh project list
+        window.location.reload();
       }, 1500);
-    }, 1000);
+    } catch (err) {
+      alert('Lỗi khi tạo dự án');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const kpis = [
@@ -186,9 +177,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
       </Modal>
 
       {/* Project Creation Modal for SALE / PM */}
-      <Modal isOpen={modals.newProject} onClose={() => setModals({...modals, newProject: false})} title={role === Role.BRANCH_PM ? "Thiết lập dự án hiện hữu" : "Khởi tạo Dự án / Lead mới"}>
+      <Modal isOpen={modals.newProject} onClose={() => setModals({...modals, newProject: false})} title={role === Role.PM ? "Thiết lập dự án hiện hữu" : "Khởi tạo Dự án / Lead mới"}>
         <form onSubmit={handleCreateProjectSubmit} className="space-y-6">
-          {role === Role.BRANCH_PM ? (
+          {role === Role.PM ? (
             <div className="space-y-2">
               <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Chọn Dự án (Đang có sẵn)</label>
               <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all">
@@ -215,22 +206,22 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
             </div>
           )}
 
-          <div className={`grid ${role === Role.BRANCH_PM ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+          <div className={`grid ${role === Role.PM ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
              <div className="space-y-2">
                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">
-                 {role === Role.BRANCH_PM ? 'Thời gian dự kiến (Giờ)' : 'Giá trị Deal (VND)'}
+                 {role === Role.PM ? 'Thời gian dự kiến (Giờ)' : 'Giá trị Deal (VND)'}
                </label>
                <input 
                  required 
                  type="number" 
                  value={newProjValue}
                  onChange={(e) => setNewProjValue(e.target.value)}
-                 placeholder={role === Role.BRANCH_PM ? "160" : "500000000"} 
+                 placeholder={role === Role.PM ? "160" : "500000000"} 
                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold" 
                />
              </div>
              
-             {role !== Role.BRANCH_PM && (
+             {role !== Role.PM && (
                <div className="space-y-2">
                  <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Xác suất (Probability)</label>
                  <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic">
@@ -243,7 +234,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
              )}
           </div>
 
-          {role !== Role.BRANCH_PM && (
+          {role !== Role.PM && (
              <div className="space-y-2">
                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Chủ nhiệm dự án (PM)</label>
                <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all">
@@ -272,10 +263,178 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
             ) : isSuccess ? (
               <><Check className="w-6 h-6 animate-bounce" /> <span>Hệ thống đã cập nhật!</span></>
             ) : (
-              role === Role.BRANCH_PM ? 'XÁC NHẬN CẬP NHẬT' : 'XÁC NHẬN KHỞI TẠO'
+              role === Role.PM ? 'XÁC NHẬN CẬP NHẬT' : 'XÁC NHẬN KHỞI TẠO'
             )}
           </button>
         </form>
+      </Modal>
+
+      {/* PKI Signature Modal */}
+      <Modal isOpen={modals.pki} onClose={() => setModals({...modals, pki: false})} title="Cổng Ký Số Phê Duyệt (PKI Gateway)">
+        <div className="space-y-6">
+          <div className="p-4 bg-bg-surface rounded-2xl border-l-4 border-accent-blue shadow-inner flex items-center justify-between">
+            <div>
+              <p className="text-[10px] uppercase font-black tracking-widest text-text-secondary opacity-70 italic mb-1">Tài liệu cần trình ký</p>
+              <p className="text-sm font-black text-text-primary italic">Hợp đồng: AMIT Corporate Branding Lead_v2</p>
+            </div>
+            <span className="px-3 py-1 bg-status-yellow/10 text-status-yellow text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-status-yellow/20 italic">Chờ Ký Số</span>
+          </div>
+
+          <div className="space-y-3">
+             <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Chứng thư số (CA / Token)</label>
+             <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all italic">
+                <option>CA: RSA-4096 (Cấp bởi VNPT CA)</option>
+                <option>Token: USB Viettel CA_v3</option>
+             </select>
+          </div>
+
+          <div className="space-y-3">
+             <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Mã PIN Khóa (Private Key)</label>
+             <div className="relative group">
+               <input 
+                 type="password" 
+                 placeholder="••••••" 
+                 className="w-full p-4 pr-12 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black text-center tracking-[1em] focus:border-accent-blue transition-all shadow-inner" 
+               />
+               <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-accent-blue opacity-50 group-focus-within:opacity-100 transition-all" />
+             </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              setIsSubmitting(true);
+              setTimeout(() => { setIsSubmitting(false); setIsSuccess(true); setTimeout(() => { setModals({...modals, pki: false}); setIsSuccess(false); }, 1500); }, 1000);
+            }}
+            disabled={isSubmitting || isSuccess}
+            className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] italic transition-all flex items-center justify-center gap-3 shadow-xl border border-white/10 ${
+              isSuccess 
+              ? 'bg-status-green text-white shadow-status-green/20' 
+              : 'bg-accent-blue text-white hover:bg-blue-600 active:scale-95 shadow-blue-500/20'
+            }`}
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : isSuccess ? (
+              <><Check className="w-6 h-6 animate-bounce shadow-xl" /> <span className="underline decoration-white/20">Đã Ký Số Thành Công!</span></>
+            ) : (
+              'XÁC THỰC KÝ SỐ'
+            )}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Contract & Pricing Modal */}
+      <Modal isOpen={modals.contract} onClose={() => setModals({...modals, contract: false})} title="Lập Báo Giá Chiến Lược (Sales Gateway)">
+        <div className="space-y-6">
+          <div className="flex gap-4 p-4 bg-status-yellow/10 rounded-2xl border border-status-yellow/20 items-center">
+             <div className="p-3 bg-status-yellow/20 rounded-xl">
+               <Target className="w-8 h-8 text-status-yellow shrink-0" />
+             </div>
+             <div>
+                <p className="text-[10px] font-black text-status-yellow uppercase tracking-[0.2em] italic mb-1">Dữ liệu Kỹ thuật từ PM</p>
+                <p className="text-xs text-text-primary font-bold italic leading-relaxed">Ticket Hệ thống V2 cần <span className="text-accent-blue underline font-black">120 Giờ</span> công thực thi. Đề xuất Rate sàn: <span className="text-accent-blue underline font-black">200K/Giờ</span>.</p>
+             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-2">
+               <label className="text-[9px] font-black text-text-secondary uppercase tracking-[0.2em] opacity-70 ml-1">Nguồn Lực Tối Thiểu</label>
+               <input type="text" value="120 Giờ" readOnly className="w-full p-4 bg-bg-surface/50 border border-border-primary rounded-xl text-text-secondary font-black opacity-80 cursor-not-allowed italic" />
+             </div>
+             <div className="space-y-2">
+               <label className="text-[9px] font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Tỷ suất Giá Bán (VND/h)</label>
+               <input type="number" placeholder="500000" defaultValue="500000" className="w-full p-4 bg-bg-surface border-2 border-accent-blue/40 rounded-xl text-text-primary font-black shadow-inner focus:border-accent-blue outline-none transition-all italic" />
+             </div>
+          </div>
+
+          <div className="p-6 bg-gradient-to-br from-bg-surface to-accent-blue/5 rounded-2xl border-l-4 border-status-green shadow-xl border border-border-primary">
+             <p className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] mb-2 italic">Tổng giá trị Đề Xuất Cuối (Gross)</p>
+             <p className="text-3xl font-black text-status-green italic">60.000.000 VND</p>
+             <div className="mt-4 pt-4 border-t border-border-primary/50 flex justify-between">
+                <p className="text-[9px] text-text-primary italic font-bold opacity-60">+ Thuế VAT 10%</p>
+                <p className="text-[9px] text-accent-blue italic font-black uppercase tracking-widest">+ Biên LN kỳ vọng: 150%</p>
+             </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              setIsSubmitting(true);
+              setTimeout(() => { setIsSubmitting(false); setIsSuccess(true); setTimeout(() => { setModals({...modals, contract: false}); setIsSuccess(false); }, 1500); }, 1000);
+            }}
+            disabled={isSubmitting || isSuccess}
+            className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-2xl italic border border-white/10 ${
+              isSuccess 
+              ? 'bg-status-green text-white shadow-status-green/20' 
+              : 'bg-status-yellow text-white hover:bg-yellow-600 active:scale-95 shadow-yellow-500/20'
+            }`}
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : isSuccess ? (
+              <><Check className="w-6 h-6 animate-bounce shadow-xl" /> <span className="underline decoration-white/20">Hợp đồng đã trình Client!</span></>
+            ) : (
+              'CHỐT GIÁ & PHÁT HÀNH BÁO GIÁ'
+            )}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Evaluate Ticket Modal for PM */}
+      <Modal isOpen={modals.evalTicket} onClose={() => setModals({...modals, evalTicket: false})} title="Đánh giá Ticket Kỹ Thuật (PM Review)">
+        <div className="space-y-6">
+          <div className="p-4 bg-bg-surface rounded-2xl border-l-4 border-purple-500 shadow-inner flex flex-col gap-2">
+            <p className="text-[10px] uppercase font-black tracking-widest text-text-secondary opacity-70 italic">Client Request: TOKYO-TICKET-092</p>
+            <p className="text-sm font-black text-text-primary italic">Khách hàng yêu cầu: Bổ sung module Xuất Báo cáo CSV/Excel.</p>
+            <div className="flex gap-2">
+              <span className="px-3 py-1 bg-red-500/10 text-red-500 text-[9px] font-black uppercase tracking-widest rounded-xl border border-red-500/20 italic">Client Tag: Lỗi (Bug)</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+             <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Đánh giá Lại Phân Loại (PM Quyết Định)</label>
+             <select className="w-full p-4 bg-bg-surface border-2 border-purple-500/40 rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-purple-500 transition-all italic shadow-inner">
+                <option value="feature">Đây là Tính Năng Mới (Feature - Cần Charge Phí)</option>
+                <option value="bug">Đúng là Sửa Lỗi (Bug - Miễn Phí)</option>
+             </select>
+             <p className="text-[9px] text-text-secondary italic ml-2">Sale sẽ dùng phân loại này để báo giá với Client.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+             <div className="space-y-2">
+               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Ước tính (Giờ)</label>
+               <input type="number" placeholder="40" defaultValue="40" className="w-full p-4 bg-bg-surface border border-border-primary rounded-xl text-text-primary font-black shadow-inner focus:border-accent-blue outline-none transition-all italic" />
+             </div>
+             <div className="space-y-2">
+               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Gán Nhân Sự Trực Tiếp</label>
+               <select className="w-full h-[58px] px-3 bg-bg-surface border border-border-primary rounded-xl text-text-primary font-black shadow-inner focus:border-accent-blue outline-none transition-all italic">
+                 <option>Để trống (Giao sau)</option>
+                 <option>Nguyễn Văn Dev</option>
+                 <option>Trần Thị Tester</option>
+               </select>
+             </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              setIsSubmitting(true);
+              setTimeout(() => { setIsSubmitting(false); setIsSuccess(true); setTimeout(() => { setModals({...modals, evalTicket: false}); setIsSuccess(false); }, 1500); }, 1000);
+            }}
+            disabled={isSubmitting || isSuccess}
+            className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 shadow-2xl italic border border-white/10 ${
+              isSuccess 
+              ? 'bg-purple-600 text-white shadow-purple-600/20' 
+              : 'bg-bg-surface text-purple-500 border-purple-500/30 hover:bg-purple-500/10 active:scale-95 shadow-purple-500/10'
+            }`}
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : isSuccess ? (
+              <><Check className="w-6 h-6 animate-bounce shadow-xl" /> <span className="underline decoration-purple-500/50">Đã cập nhật Ticket!</span></>
+            ) : (
+              'CHUYỂN TICKET SANG CHO SALES'
+            )}
+          </button>
+        </div>
       </Modal>
 
       {/* Header Info */}
@@ -288,21 +447,50 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
           <h2 className="text-2xl font-black text-text-primary italic tracking-tight uppercase italic underline decoration-accent-blue/20">Tài khoản Quản trị, {userName}</h2>
           <p className="text-text-secondary text-sm font-medium mt-1 tracking-wide">Phân tích đa chiều về tài chính, dự án và nhân sự chiến lược.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3 mt-4 md:mt-0 items-center">
           <button 
             onClick={() => setModals({...modals, export: true})}
-            className="flex items-center gap-2 px-5 py-2.5 bg-bg-card text-text-primary rounded-xl border border-border-primary font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-lg active:scale-95 italic"
+            className="flex items-center gap-2 px-4 py-2 bg-bg-card text-text-primary rounded-xl border border-border-primary font-bold text-[10px] hover:bg-slate-100 dark:hover:bg-slate-800 transition-all shadow-lg active:scale-95 italic uppercase tracking-widest"
           >
             <Download className="w-4 h-4" />
-            <span>Xuất báo cáo</span>
+            <span className="hidden sm:inline">Xuất BC</span>
           </button>
-          {(role === Role.SALE || role === Role.GLOBAL_ADMIN || role === Role.BRANCH_PM) && (
+          
+          <button 
+            onClick={() => setModals({...modals, pki: true})}
+            className="flex items-center gap-2 px-4 py-2 bg-bg-surface text-accent-blue rounded-xl border border-accent-blue/30 font-black text-[10px] hover:bg-accent-blue/10 transition-all shadow-lg shadow-blue-500/10 active:scale-95 uppercase tracking-[0.2em] italic"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Ký PKI</span>
+          </button>
+
+          {role === Role.PM && (
+            <button 
+              onClick={() => setModals({...modals, evalTicket: true})}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600/10 text-purple-500 rounded-xl border border-purple-500/30 font-black text-[10px] hover:bg-purple-600/20 transition-all shadow-lg shadow-purple-500/10 active:scale-95 uppercase tracking-[0.2em] italic"
+            >
+              <Inbox className="w-4 h-4" />
+              <span>Duyệt Ticket</span>
+            </button>
+          )}
+
+          {role === Role.SALE && (
+            <button 
+              onClick={() => setModals({...modals, contract: true})}
+              className="flex items-center gap-2 px-4 py-2 bg-status-yellow text-white rounded-xl border border-white/10 font-black text-[10px] shadow-xl shadow-yellow-500/20 transition-all hover:bg-yellow-600 active:scale-95 uppercase tracking-[0.2em] italic"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Chốt Báo Giá</span>
+            </button>
+          )}
+
+          {(role === Role.SALE || role === Role.CEO || role === Role.PM) && (
             <button 
               onClick={() => setModals({...modals, newProject: true})}
-              className="flex items-center gap-2 px-5 py-2.5 bg-accent-blue text-white rounded-xl font-bold text-sm shadow-xl shadow-blue-500/25 transition-all hover:bg-blue-600 active:scale-95 uppercase tracking-widest"
+              className="flex items-center gap-2 px-4 py-2 bg-accent-blue text-white rounded-xl border border-white/10 font-black text-[10px] shadow-xl shadow-blue-500/25 transition-all hover:bg-blue-600 active:scale-95 uppercase tracking-[0.2em] italic"
             >
               <Plus className="w-4 h-4" />
-              <span>{role === Role.BRANCH_PM ? 'Khởi tạo thông số' : 'Dự án mới'}</span>
+              <span>{role === Role.PM ? 'Khởi Tạo' : 'Dự án mới'}</span>
             </button>
           )}
         </div>
@@ -352,7 +540,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ userName, role,
                         Auto: Ngân sách &gt; 80%
                       </span>
                     )}
-                    {(role === Role.SALE || role === Role.GLOBAL_ADMIN) && (
+                    {(role === Role.SALE || role === Role.CEO) && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleSendManualAlert(p.id); }}
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-status-red/5 text-status-red hover:bg-status-red/20 transition-all border border-status-red/10 flex items-center gap-1.5 shadow-sm"

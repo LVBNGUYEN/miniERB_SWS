@@ -128,7 +128,7 @@ const TaskRequestFlow: React.FC = () => {
 
               {/* Action Center per Role */}
               <div className="flex items-center gap-3">
-                 {req.status === 'PROPOSED' && currentRole === Role.BRANCH_PM && (
+                 {req.status === 'PROPOSED' && currentRole === Role.PM && (
                    <button 
                      onClick={() => handleAction(req.id, 'estimate', { hours: 24, signature: 'SIG_PM_X1' })}
                      className="px-4 py-2 bg-accent-blue text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/20"
@@ -152,7 +152,7 @@ const TaskRequestFlow: React.FC = () => {
                      ✍️ Khách hàng Ký duyệt (Step 2)
                    </button>
                  )}
-                 {req.status === 'CLIENT_SIGNED' && currentRole === Role.GLOBAL_ADMIN && (
+                 {req.status === 'CLIENT_SIGNED' && currentRole === Role.CEO && (
                    <button 
                      onClick={() => handleAction(req.id, 'ceo-sign', { ceoId: user.id, signature: 'SIG_CEO_X3' })}
                      className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/20"
@@ -160,7 +160,7 @@ const TaskRequestFlow: React.FC = () => {
                      🏢 CEO Ký xác nhận (Step 3)
                    </button>
                  )}
-                 {req.status === 'CEO_SIGNED' && currentRole === Role.BRANCH_PM && (
+                 {req.status === 'CEO_SIGNED' && currentRole === Role.PM && (
                    <button 
                      onClick={() => handleAction(req.id, 'distribute')}
                      className="px-4 py-2 bg-status-green text-white rounded-xl font-bold text-xs"

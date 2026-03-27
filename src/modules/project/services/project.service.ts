@@ -58,6 +58,12 @@ export class ProjectService {
     });
   }
 
+  async create(data: any): Promise<Project> {
+    const project = this.projectRepository.create(data as Partial<Project>);
+    if (!project.status) project.status = 'ACTIVE';
+    return this.projectRepository.save(project);
+  }
+
   async findAll(): Promise<any[]> {
     const projects = await this.projectRepository.find({
       relations: ['tasks', 'quotation'],

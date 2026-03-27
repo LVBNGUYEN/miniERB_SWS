@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Clock, CheckCircle2, Bot, ArrowRight, Zap, Check, Cpu } from 'lucide-react';
+import { Briefcase, Clock, CheckCircle2, Bot, ArrowRight, Zap, Cpu, Loader2 } from 'lucide-react';
 import Modal from '../../components/Modal';
+import { api } from '../../api';
 
 interface VendorDashboardProps {
   userName: string;
@@ -12,12 +13,33 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [aiModal, setAiModal] = useState({ isOpen: false, type: '' });
   const [isOptimizing, setIsOptimizing] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const tasks = [
-    { title: 'Tokyo Tech Frontend Dev', deadline: '2024-03-30', hours: 40, status: 'Đang thực hiện', desc: 'Xây dựng module Dashboard cho đối tác Nhật Bản bằng React/Tailwind.' },
-    { title: 'AMIT ERP Backend Sync', deadline: '2024-04-05', hours: 24, status: 'Chờ phê duyệt', desc: 'Đồng bộ dữ liệu SQL Server với PostgreSQL thông qua kiến trúc Microservices.' },
-    { title: 'API Integration V2', deadline: '2024-03-25', hours: 16, status: 'Hoàn thành', desc: 'Tích hợp API thanh toán VNPay và ví điện tử MoMo.' },
-  ];
+  useEffect(() => {
+    fetchMyTasks();
+  }, []);
+
+  const fetchMyTasks = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/projects/tasks/my');
+      if (Array.isArray(data)) {
+        setTasks(data.map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          deadline: new Date(t.createdAt).toLocaleDateString('vi-VN'),
+          hours: t.estimatedHours,
+          status: t.status === 'TODO' ? 'Chưa thực hiện' : t.status === 'IN_PROGRESS' ? 'Đang thực hiện' : 'Hoàn thành',
+          desc: `Mã Task: ${t.id}`
+        })));
+      }
+    } catch (err) {
+      console.error('Fetch tasks error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleOptimize = () => {
     setIsOptimizing(true);
@@ -49,9 +71,9 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: 'Giờ làm hôm nay', value: '8.5h', icon: Clock },
-          { label: 'Dự án đang tham gia', value: '3', icon: Briefcase },
-          { label: 'Task hoàn thành (Tuần)', value: '12', icon: CheckCircle2 },
+          { label: 'Công việc tồn đọng', value: tasks.filter(t => t.status !== 'Hoàn thành').length.toString(), icon: Clock },
+          { label: 'Dự án đang tham gia', value: 'Active', icon: Briefcase },
+          { label: 'Task hoàn thành', value: tasks.filter(t => t.status === 'Hoàn thành').length.toString(), icon: CheckCircle2 },
         ].map((kpi, idx) => (
           <div key={idx} className="bg-bg-card p-6 rounded-3xl border border-border-primary relative overflow-hidden group shadow-xl hover:border-status-green/40 transition-all hover:shadow-emerald-500/5">
              <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
@@ -71,41 +93,43 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
            <div className="flex items-center justify-between pb-6 border-b border-border-primary">
               <h3 className="text-lg font-black text-text-primary flex items-center gap-3 uppercase tracking-tight italic underline decoration-accent-blue/10 underline-offset-4">
                  <Briefcase className="w-6 h-6 text-accent-blue" />
-                 Hạng mục Công việc (Task List)
+                 Hạng mục Công việc (Current Tasks)
               </h3>
-              <div className="flex gap-1">
-                 <div className="w-2 h-2 rounded-full bg-status-green shadow-lg"></div>
-                 <div className="w-2 h-2 rounded-full bg-border-primary"></div>
-                 <div className="w-2 h-2 rounded-full bg-border-primary"></div>
-              </div>
+              <button onClick={fetchMyTasks} className="p-2 hover:bg-slate-700/50 rounded-lg transition-all"><Cpu className={`w-4 h-4 text-accent-blue ${loading ? 'animate-spin' : ''}`} /></button>
            </div>
-           <div className="space-y-4">
-              {tasks.map((t, i) => (
-                 <div 
-                   key={i} 
-                   onClick={() => setSelectedTask(t)}
-                   className="flex items-center justify-between p-5 bg-bg-surface/30 rounded-2xl border border-border-primary group hover:border-accent-blue/30 transition-all cursor-pointer hover:bg-bg-card shadow-sm hover:shadow-lg relative overflow-hidden"
-                 >
-                    <div className={`absolute top-0 left-0 w-1.5 h-full transition-all group-hover:w-2 ${
-                        t.status === 'Đang thực hiện' ? 'bg-status-yellow' : 
-                        t.status === 'Hoàn thành' ? 'bg-status-green' : 'bg-accent-blue'
-                    }`}></div>
-                    <div className="pl-2 space-y-1">
-                       <p className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-all italic uppercase tracking-tight underline decoration-transparent group-hover:decoration-accent-blue">{t.title}</p>
-                       <p className="text-[10px] text-text-secondary mt-1 font-black italic uppercase tracking-widest opacity-60">Thời gian dự kiến: <span className="text-text-primary underline decoration-accent-blue/10 underline-offset-2">{t.hours} Giờ</span></p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                       <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase italic tracking-widest border ${
-                           t.status === 'Đang thực hiện' ? 'bg-status-yellow/10 text-status-yellow border-status-yellow/20' : 
-                           t.status === 'Hoàn thành' ? 'bg-status-green/10 text-status-green border-status-green/20' : 
-                           'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner'
-                       }`}>{t.status}</span>
-                       <button className="p-2 bg-bg-surface rounded-xl border border-border-primary opacity-0 group-hover:opacity-100 transition-all shadow-sm">
-                          <ArrowRight className="w-4 h-4 text-accent-blue" />
-                       </button>
-                    </div>
-                 </div>
-              ))}
+           <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+              {loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-accent-blue" /></div>
+              ) : tasks.length === 0 ? (
+                <div className="text-center py-10 opacity-40 italic font-black uppercase tracking-widest text-text-secondary text-xs">Chưa có hạng mục công việc định danh</div>
+              ) : (
+                tasks.map((t, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => setSelectedTask(t)}
+                    className="flex items-center justify-between p-5 bg-bg-surface/30 rounded-2xl border border-border-primary group hover:border-accent-blue/30 transition-all cursor-pointer hover:bg-bg-card shadow-sm hover:shadow-lg relative overflow-hidden"
+                  >
+                      <div className={`absolute top-0 left-0 w-1.5 h-full transition-all group-hover:w-2 ${
+                          t.status === 'Đang thực hiện' ? 'bg-status-yellow' : 
+                          t.status === 'Hoàn thành' ? 'bg-status-green' : 'bg-accent-blue'
+                      }`}></div>
+                      <div className="pl-2 space-y-1">
+                        <p className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-all italic uppercase tracking-tight underline decoration-transparent group-hover:decoration-accent-blue">{t.title}</p>
+                        <p className="text-[10px] text-text-secondary mt-1 font-black italic uppercase tracking-widest opacity-60">Ước lượng: <span className="text-text-primary underline decoration-accent-blue/10 underline-offset-2">{t.hours} Giờ</span></p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase italic tracking-widest border ${
+                            t.status === 'Đang thực hiện' ? 'bg-status-yellow/10 text-status-yellow border-status-yellow/20' : 
+                            t.status === 'Hoàn thành' ? 'bg-status-green/10 text-status-green border-status-green/20' : 
+                            'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner'
+                        }`}>{t.status}</span>
+                        <button className="p-2 bg-bg-surface rounded-xl border border-border-primary opacity-0 group-hover:opacity-100 transition-all shadow-sm">
+                            <ArrowRight className="w-4 h-4 text-accent-blue" />
+                        </button>
+                      </div>
+                  </div>
+                ))
+              )}
            </div>
         </div>
 
@@ -151,8 +175,8 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
         {selectedTask && (
           <div className="space-y-8 p-4">
             <div className="p-6 bg-bg-surface rounded-3xl border-l-8 border-status-green border border-border-primary shadow-inner">
-              <p className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] mb-2 italic ml-1">Dự án hiện tại</p>
-              <h4 className="text-xl font-black text-text-primary italic uppercase tracking-tight decoration-accent-blue/20 underline decoration-2">AMIT ERP Core System v2.0</h4>
+              <p className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] mb-2 italic ml-1">ID Công việc</p>
+              <h4 className="text-xl font-black text-text-primary italic uppercase tracking-tight decoration-accent-blue/20 underline decoration-2">{selectedTask.id}</h4>
             </div>
             <div className="space-y-5">
               <div className="flex justify-between items-center pb-5 border-b border-border-primary">
@@ -167,7 +191,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
                 }`}>{selectedTask.status}</span>
               </div>
               <div className="p-6 bg-bg-surface rounded-3xl border border-border-primary shadow-inner leading-relaxed text-sm font-bold text-text-secondary italic">
-                 <p className="border-b border-border-primary pb-3 mb-3 text-[10px] uppercase font-black tracking-widest text-text-primary/50">Mô tả chi tiết:</p>
+                 <p className="border-b border-border-primary pb-3 mb-3 text-[10px] uppercase font-black tracking-widest text-text-primary/50">Mô tả hệ thống:</p>
                 {selectedTask.desc}
               </div>
             </div>
@@ -178,7 +202,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
               }}
               className="w-full py-5 bg-status-green text-white rounded-3xl font-black text-md uppercase tracking-[0.2em] shadow-2xl shadow-emerald-500/20 active:scale-95 italic border border-white/10"
             >
-              CẬP NHẬT TIẾN ĐỘ THỰC TẾ
+              KHAI BÁO TIMESHEET TRẢ TIỀN
             </button>
             <p className="text-[9px] text-text-secondary font-black uppercase text-center opacity-40 italic mt-2 tracking-widest">Dữ liệu sẽ được đồng bộ ngay lập tức tới PM phụ trách.</p>
           </div>
@@ -205,7 +229,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
               </div>
               <div className="p-6 bg-bg-surface rounded-3xl border-l-8 border-accent-blue shadow-lg">
                 <p className="text-sm text-text-primary font-bold italic leading-relaxed">
-                  "Dựa trên các phân hệ đã thực hiện, bạn đang hoàn thành task nhanh hơn dự kiến trung bình 0.5 ngày. Điều này đóng góp trực tiếp vào CSAT (98%) của Tokyo Tech."
+                  "Dựa trên các phân hệ đã thực hiện, bạn đang hoàn thành task nhanh hơn dự kiến trung bình 0.5 ngày. Điều này đóng góp trực tiếp vào CSAT (98%) của dự án hiện tại."
                 </p>
               </div>
               <p className="text-[9px] text-text-secondary font-black text-center uppercase tracking-widest opacity-40 italic">Báo cáo cập nhật theo từng giờ công được khai báo.</p>
@@ -220,7 +244,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ userName }) => {
                     <Zap className="w-10 h-10 text-status-green shrink-0 shadow-xl" />
                     <div>
                         <p className="text-xs font-black text-text-secondary uppercase tracking-[0.2em] mb-2">Đề xuất ưu tiên (AI Agent):</p>
-                        <p className="text-md font-black text-text-primary italic leading-relaxed uppercase tracking-tight underline decoration-status-green/10 underline-offset-4">Ưu tiên hoàn thiện "Frontend Dev" trong sáng nay để giải phóng Pipeline cho đội ngũ QC và kịp tiến độ Demo Tokyo Stage 2.</p>
+                        <p className="text-md font-black text-text-primary italic leading-relaxed uppercase tracking-tight underline decoration-status-green/10 underline-offset-4">Hệ thống gợi ý ưu tiên các task Deadline gần nhất và có độ phức tạp cao để tối ưu dòng tiền Vendor.</p>
                     </div>
                   </div>
                </div>

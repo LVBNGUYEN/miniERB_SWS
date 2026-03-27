@@ -49,8 +49,8 @@ const Dashboard: React.FC = () => {
 
   // Role-based Switcher
   switch (role) {
-    case Role.GLOBAL_ADMIN:
-    case Role.BRANCH_PM:
+    case Role.CEO:
+    case Role.PM:
     case Role.SALE:
       return (
         <ExecutiveDashboard 
