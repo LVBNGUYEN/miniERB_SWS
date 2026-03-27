@@ -20,7 +20,7 @@ export class FinanceController {
   ) {}
 
   @Post('invoices/:projectId')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @ApiOperation({ summary: 'Create an invoice for a project (Flow 10)' })
   async createInvoice(
     @Param('projectId', ParseUUIDPipe) projectId: string,
@@ -30,7 +30,7 @@ export class FinanceController {
   }
 
   @Post('payments/:invoiceId')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @ApiOperation({ summary: 'Register a client payment (Flow 11)' })
   async registerPayment(
     @Param('invoiceId', ParseUUIDPipe) invoiceId: string,
@@ -41,7 +41,7 @@ export class FinanceController {
   }
 
   @Get('pnl/:projectId')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @ApiOperation({ summary: 'Calculate Project P&L using Strategy Pattern (Flow 12)' })
   async getPnL(@Param('projectId', ParseUUIDPipe) projectId: string) {
     return this.pnlService.calculateProjectPNL(projectId);

@@ -11,7 +11,7 @@ export class AiEngineController {
   constructor(private readonly aiEngineService: AiEngineService) {}
 
   @Post('chat')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.SALE)
+  @Roles(Role.CEO, Role.PM, Role.SALE)
   async chat(@Body() body: { query: string }) {
     if (!body.query) {
       throw new UnauthorizedException('Chưa có câu hỏi.');

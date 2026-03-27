@@ -17,7 +17,7 @@ export class TimesheetController {
   constructor(private readonly timesheetService: TimesheetService) {}
 
   @Post()
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.VENDOR)
+  @Roles(Role.CEO, Role.PM, Role.VENDOR)
   @ApiOperation({ summary: 'Log hours for a task (Flow 4)' })
   async logHours(@Body() body: any) {
     const { taskId, hours, vendorId, snapshotPrice } = body;
@@ -25,7 +25,7 @@ export class TimesheetController {
   }
 
   @Patch(':id/approve')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @UseInterceptors(AuditInterceptor)
   @Audit('tms_timesheets', 'APPROVE')
   @ApiOperation({ summary: 'Approve a timesheet and record vendor debt' })
@@ -35,14 +35,14 @@ export class TimesheetController {
   }
 
   @Get('pending')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @ApiOperation({ summary: 'List pending timesheets for approval' })
   async getPending() {
     return this.timesheetService.findPending();
   }
 
   @Get('my')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.VENDOR)
+  @Roles(Role.CEO, Role.PM, Role.VENDOR)
   @ApiOperation({ summary: 'List current user timesheets' })
   async getMy(@CurrentUser() user: any) {
     const userId = user.id || user.userId || user.sub;

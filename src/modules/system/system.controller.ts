@@ -1,10 +1,9 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Patch, Param } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SystemService } from './system.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { JwtAuthGuard } from '../iam/guards/jwt-auth.guard';
-import { RolesGuard } from '../iam/guards/roles.guard';
-import { Roles } from '../iam/decorators/roles.decorator';
-import { Role } from '../iam/entities/role.enum';
+import { CurrentUser } from '../iam/decorators/current-user.decorator';
 
 @Controller('system')
 export class SystemController {
@@ -18,5 +17,21 @@ export class SystemController {
   @Get('branches')
   async getAllBranches() {
     return this.systemService.getAllBranches();
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy thông báo cho người dùng hiện tại' })
+  @Get('notifications')
+  async getMyNotifications(@CurrentUser() user: any) {
+    return this.systemService.getUserNotifications(user.userId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Đánh dấu thông báo là đã đọc' })
+  @Patch('notifications/:id/read')
+  async readNotification(@Param('id') id: string) {
+    return this.systemService.markNotificationRead(id);
   }
 }

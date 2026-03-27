@@ -45,6 +45,20 @@ export class AiEngineService {
         };
     }
 
+    if (q.includes('báo giá') || q.includes('quotation')) {
+        return {
+            content: '📑 Draft Báo giá Dự án Mới (Auto-Generated): Dựa trên scope đã thảo luận, AI ước tính ngân sách cho 6 Sprint (3 tháng): ~450,000,000 VND. Bao gồm: 3 Dev, 1 QA, 1 PM. Bạn có muốn xuất file PDF chính thức không?',
+            layout: 'standard'
+        };
+    }
+
+    if (q.includes('rủi ro') || q.includes('risk')) {
+        return {
+            content: '⚠️ Phân tích Rủi ro Hệ thống (Risk Analysis): Phát hiện 2 rủi ro quan trọng: \n1. Deadline dự án Mobile Banking bị trượt 4 ngày do thiếu tài liệu API từ Vendor. \n2. Biến động nhân sự cận Tết tại khối Frontend. Đề nghị: Kích hoạt kế hoạch dự phòng, mời Vendor B tham gia hỗ trợ gấp.',
+            layout: 'standard'
+        };
+    }
+
     return {
       content: '🤖 Tôi đã ghi nhận yêu cầu: "' + query + '". Tôi đang quét toàn bộ dữ liệu 16 phân hệ (Tài chính, Dự án, Nhân sự, Sales...). Phân tích sơ bộ cho thấy mọi chỉ số đang ở mức an toàn. Bạn có muốn đi show sâu vào module nào không?',
       layout: 'standard'

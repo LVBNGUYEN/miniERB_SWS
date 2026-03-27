@@ -22,7 +22,7 @@ export class SysAlertController {
   }
 
   @Post(':projectId/manual-alert')
-  @Roles(Role.GLOBAL_ADMIN, Role.SALE)
+  @Roles(Role.CEO, Role.SALE)
   @ApiOperation({ summary: 'Send manual budget alert to PM' })
   async sendManualAlert(
     @Param('projectId', ParseUUIDPipe) projectId: string,
