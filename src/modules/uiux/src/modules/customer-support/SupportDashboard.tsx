@@ -18,7 +18,8 @@ import {
   Mail,
   History,
   Check,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react';
 import { getCookie } from '../../utils/cookie';
 import { Role } from '../../../../iam/entities/role.enum';
@@ -29,6 +30,7 @@ const SupportDashboard: React.FC = () => {
   const user = userStr ? JSON.parse(userStr) : null;
   const role = user?.role;
   const isClient = role === Role.CLIENT;
+  const isStaff = role === Role.CEO || role === Role.PM || role === Role.SALE;
 
   const [tickets, setTickets] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -37,6 +39,11 @@ const SupportDashboard: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  
+  // Modal State cho Quotation
+  const [quotationTicket, setQuotationTicket] = useState<any | null>(null);
+  const [quotationForm, setQuotationForm] = useState({ title: '', amount: '5000' });
   const [newTicket, setNewTicket] = useState({ 
     clientId: isClient ? user?.id : '', 
     subject: '', 
@@ -88,6 +95,48 @@ const SupportDashboard: React.FC = () => {
       }, 1500);
     } catch (err) {
       alert('Lỗi khi gửi yêu cầu hỗ trợ.');
+    }
+  };
+
+  const handleCategorize = async (id: string, type: 'BUG' | 'CHANGE_REQUEST') => {
+    try {
+      setIsUpdating(id);
+      await api.patch(`/support/tickets/${id}/categorize`, { type });
+      await fetchData();
+    } catch (err) {
+      alert('Lỗi khi phân loại ticket.');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  const handleOpenQuotationModal = (ticket: any) => {
+    setQuotationTicket(ticket);
+    setQuotationForm({ title: `CR: ${ticket.title}`, amount: '5000' });
+  };
+
+  const handleCreateQuotation = async () => {
+    const { title, amount } = quotationForm;
+    if (!amount || isNaN(Number(amount))) {
+      alert('Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+    try {
+      setIsUpdating(quotationTicket.id);
+      await api.post('/sales/quotations', {
+        title,
+        totalAmount: Number(amount),
+        ticketId: quotationTicket.id,
+        branchId: user?.branchId || quotationTicket.clientId, 
+        clientId: quotationTicket.clientId,
+      });
+      alert('Đã tạo báo giá thành công. Vui lòng vào Tab Báo giá để chờ duyệt.');
+      setQuotationTicket(null);
+      await fetchData();
+    } catch (err) {
+      alert('Lỗi tạo báo giá.');
+    } finally {
+      setIsUpdating(null);
     }
   };
 
@@ -191,21 +240,49 @@ const SupportDashboard: React.FC = () => {
                    </div>
 
                    <div className="flex-1 space-y-2">
-                      <h4 className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-colors font-sans italic tracking-tight uppercase leading-relaxed">{t.title}</h4>
+                      <h4 className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-colors font-sans italic tracking-tight uppercase leading-relaxed">
+                        {t.ticketType === 'CHANGE_REQUEST' && t.status === 'PENDING_QUOTATION' && (
+                          <Lock className="w-3.5 h-3.5 inline mr-1 text-status-yellow mb-1" />
+                        )}
+                        {t.title}
+                      </h4>
                       <p className="text-[10px] text-text-secondary font-black flex items-center gap-1.5 italic uppercase opacity-70">
                          <User className="w-3.5 h-3.5" /> 
-                         {isClient ? 'Trạng thái xử lý' : `Khách hàng: ${t.clientName || 'Internal'}`} • Loại: {t.type}
+                         {isClient ? 'Trạng thái xử lý' : `Khách hàng: ${t.clientName || 'Internal'}`} • Loại: {t.ticketType || t.type}
                       </p>
                    </div>
 
                    <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-border-primary/50">
-                      <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] italic border ${
-                         t.status === 'Khẩn cấp' ? 'bg-status-red/10 text-status-red border-status-red/20 animate-pulse' :
-                         t.status === 'PENDING' ? 'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner' :
-                         t.status === 'CLOSED' ? 'bg-bg-surface text-text-secondary border-border-primary/50 opacity-40' :
-                         'bg-status-yellow/10 text-status-yellow border-status-yellow/20'
-                      }`}>
-                         {t.status}
+                      <div className="flex flex-col gap-2 md:items-end">
+                        <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] italic border text-center ${
+                           t.status === 'Khẩn cấp' ? 'bg-status-red/10 text-status-red border-status-red/20 animate-pulse' :
+                           t.status === 'PENDING_QUOTATION' || t.status === 'PENDING' ? 'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner' :
+                           t.status === 'CLOSED' || t.status === 'RESOLVED' ? 'bg-bg-surface text-text-secondary border-border-primary/50 opacity-40' :
+                           'bg-status-yellow/10 text-status-yellow border-status-yellow/20'
+                        }`}>
+                           {t.status}
+                        </div>
+                        {isStaff && t.ticketType === 'CHANGE_REQUEST' && t.status === 'PENDING_QUOTATION' && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleOpenQuotationModal(t); }}
+                            disabled={isUpdating === t.id}
+                            className={`whitespace-nowrap px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] italic border text-center transition-all shadow-inner ${isUpdating === t.id ? 'opacity-50' : 'bg-status-green/10 text-status-green border-status-green/20 hover:bg-status-green hover:text-white'}`}
+                          >
+                            Tạo Báo giá
+                          </button>
+                        )}
+                        {isStaff && t.status === 'OPEN' && (
+                          <select 
+                            className={`bg-bg-surface border border-accent-blue/30 rounded-lg text-[9px] font-black uppercase tracking-widest px-2 py-1 outline-none text-text-primary shadow-inner ${isUpdating === t.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-accent-blue'}`}
+                            onChange={(e) => handleCategorize(t.id, e.target.value as 'BUG' | 'CHANGE_REQUEST')}
+                            defaultValue=""
+                            disabled={isUpdating === t.id}
+                          >
+                            <option value="" disabled>Phân loại...</option>
+                            <option value="BUG">Sửa lỗi (BUG)</option>
+                            <option value="CHANGE_REQUEST">Yêu cầu mới (CR)</option>
+                          </select>
+                        )}
                       </div>
                       <button className="p-2.5 text-text-secondary hover:text-text-primary transition-all bg-bg-surface border border-border-primary rounded-xl group-hover:border-accent-blue/50 group-hover:shadow-lg active:scale-90">
                         <MoreVertical className="w-4 h-4" />

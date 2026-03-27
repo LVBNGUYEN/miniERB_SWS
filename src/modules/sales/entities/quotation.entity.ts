@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AbstractEntity } from '../../../common/abstract.entity';
 import { Branch } from '../../system/entities/branch.entity';
 import { User } from '../../iam/entities/user.entity';
+import { QuotationStatus } from './quotation-status.enum';
 
 @Entity('sls_quotations')
 export class Quotation extends AbstractEntity {
@@ -29,16 +30,22 @@ export class Quotation extends AbstractEntity {
   @Column({ length: 255 })
   title: string;
 
-  @Column({ name: 'total_estimated_hours', type: 'decimal', precision: 10, scale: 2 })
+  @Column({ length: 500, nullable: true })
+  description: string;
+
+  @Column({ name: 'ticket_id', type: 'uuid', nullable: true })
+  ticketId: string;
+
+  @Column({ name: 'total_estimated_hours', type: 'decimal', precision: 10, scale: 2, nullable: true })
   totalEstimatedHours: number;
 
   @Column({ name: 'total_amount', type: 'decimal', precision: 15, scale: 2 })
   totalAmount: number;
 
-  @Column({ length: 50 })
-  status: string;
+  @Column({ type: 'enum', enum: QuotationStatus, default: QuotationStatus.DRAFT })
+  status: QuotationStatus;
 
-  @Column({ name: 'valid_until', type: 'date' })
+  @Column({ name: 'valid_until', type: 'date', nullable: true })
   validUntil: Date;
 
   @Column({ name: 'file_url', length: 255, nullable: true })

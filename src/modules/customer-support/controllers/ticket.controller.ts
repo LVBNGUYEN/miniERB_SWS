@@ -1,9 +1,10 @@
-import { Controller, Post, Get, Body, Param, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Param, Req, UseGuards, ParseUUIDPipe, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../../iam/guards/roles.guard';
 import { Roles } from '../../iam/decorators/roles.decorator';
 import { Role } from '../../iam/entities/role.enum';
+import { TicketType } from '../entities/ticket.entity';
 import { TicketService } from '../services/ticket.service';
 
 @ApiTags('Customer Support')
@@ -22,6 +23,20 @@ export class TicketController {
     @Body('hourlyRate') hourlyRate: number,
   ) {
     return this.ticketService.evaluateChangeRequest(id, estimatedHours, hourlyRate);
+  }
+
+  @Patch('tickets/:id/categorize')
+  @Roles(Role.CEO, Role.PM, Role.SALE)
+  @ApiOperation({ summary: 'Categorize Ticket to BUG or CHANGE_REQUEST' })
+  async categorizeTicket(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('type') type: string,
+    @Req() req: any,
+  ) {
+    if (type !== TicketType.BUG && type !== TicketType.CHANGE_REQUEST) {
+      throw new BadRequestException('Invalid ticket type. Must be BUG or CHANGE_REQUEST');
+    }
+    return this.ticketService.categorizeTicket(id, type as TicketType, req.user.id);
   }
 
   @Post('tickets')

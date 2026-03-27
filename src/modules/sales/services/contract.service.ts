@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Contract } from '../entities/contract.entity';
 import { Quotation } from '../entities/quotation.entity';
+import { QuotationStatus } from '../entities/quotation-status.enum';
 import { ContractMilestone } from '../entities/contract-milestone.entity';
 import { PkiService } from '../../pki/services/pki.service';
 import { ProjectService } from '../../project/services/project.service';
@@ -36,12 +37,12 @@ export class ContractService {
         throw new NotFoundException('Quotation not found');
       }
 
-      if (quotation.status === 'APPROVED') {
+      if (quotation.status === QuotationStatus.APPROVED) {
         throw new BadRequestException('Báo giá này đã được thực hiện.');
       }
 
       // 1. Mark quotation as processing
-      quotation.status = 'APPROVED';
+      quotation.status = QuotationStatus.APPROVED;
       await queryRunner.manager.save(quotation);
 
       // 2. Base Document Info

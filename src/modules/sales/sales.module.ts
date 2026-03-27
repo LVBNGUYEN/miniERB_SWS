@@ -8,17 +8,20 @@ import { PkiModule } from '../pki/pki.module';
 import { ProjectModule } from '../project/project.module';
 import { SalesController } from './controllers/sales.controller';
 import { SysAuditModule } from '../sys-audit/sys-audit.module';
+import { QuotationService } from './services/quotation.service';
+import { QuotationController } from './controllers/quotation.controller';
+import { CustomerSupportModule } from '../customer-support/customer-support.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contract, Quotation, ContractMilestone]),
     PkiModule,
     ProjectModule,
-    SysAuditModule
+    SysAuditModule,
+    CustomerSupportModule
   ],
-  controllers: [SalesController],
-  providers: [ContractService],
-  exports: [ContractService],
+  controllers: [SalesController, QuotationController],
+  providers: [ContractService, QuotationService],
+  exports: [ContractService, QuotationService],
 })
 export class SalesModule {}
-

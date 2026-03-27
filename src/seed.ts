@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { DataSource } from 'typeorm';
 import { User } from './modules/iam/entities/user.entity';
 import { Quotation } from './modules/sales/entities/quotation.entity';
+import { QuotationStatus } from './modules/sales/entities/quotation-status.enum';
 import { Branch } from './modules/system/entities/branch.entity';
 import * as bcrypt from 'bcrypt';
 
@@ -119,7 +120,7 @@ async function bootstrap() {
         title: 'App Mobile Vietcombank (Giai đoạn 1)',
         totalEstimatedHours: 500,
         totalAmount: 150000000, 
-        status: 'DRAFT',
+        status: QuotationStatus.DRAFT,
         validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 
       });
       await quotationRepository.save(quotation);
@@ -130,7 +131,7 @@ async function bootstrap() {
       // Update references to new client/pm
       quotation.clientId = client.id;
       quotation.pmId = pm.id;
-      quotation.status = 'DRAFT';
+      quotation.status = QuotationStatus.DRAFT;
       await quotationRepository.save(quotation);
     }
 

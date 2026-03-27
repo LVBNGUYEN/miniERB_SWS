@@ -15,6 +15,7 @@ import DigitalSignatureDashboard from './modules/pki/DigitalSignatureDashboard';
 import AuditLogDashboard from './modules/sys-audit/AuditLogDashboard';
 import SupportDashboard from './modules/customer-support/SupportDashboard';
 import ContractDashboard from './modules/sales/ContractDashboard';
+import QuotationManager from './modules/sales/QuotationManager';
 import LoginPage from './modules/iam/LoginPage';
 
 const App: React.FC = () => {
@@ -43,6 +44,7 @@ const App: React.FC = () => {
           <Route path="audit-logs" element={<AuditLogDashboard />} />
           <Route path="customer-support" element={<SupportDashboard />} />
           <Route path="contracts" element={<ContractDashboard />} />
+          <Route path="quotations" element={<QuotationManager />} />
           
           {/* Default fallback inside layout */}
           <Route path="*" element={<Navigate to="/" replace />} />
