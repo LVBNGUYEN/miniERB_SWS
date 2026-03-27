@@ -13,16 +13,16 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class VendorController {
-  constructor(private readonly vendorService: VendorService) {}
+  constructor(private readonly vendorService: VendorService) { }
 
   @Get(':id')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   async getVendorDetails(@Param('id') id: string) {
     return this.vendorService.getVendorDetails(id);
   }
 
   @Patch(':id')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   async updateVendor(
     @CurrentUser() user: any,
     @Param('id') id: string,

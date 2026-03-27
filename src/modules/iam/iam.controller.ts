@@ -35,7 +35,7 @@ export class IamController {
 
   // ── Create Vendor (Admin Only) ──
   @ApiBearerAuth()
-  @Roles(Role.GLOBAL_ADMIN)
+  @Roles(Role.CEO)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Post('vendor')
   async createVendor(@CurrentUser() user: any, @Body() createVendorDto: CreateVendorDto) {
