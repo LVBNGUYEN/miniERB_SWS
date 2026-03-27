@@ -1,4 +1,4 @@
-import { Controller, Post, Param, ParseUUIDPipe, UseGuards, UseInterceptors, Get } from '@nestjs/common';
+import { Controller, Post, Param, Body, ParseUUIDPipe, UseGuards, UseInterceptors, Get, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { RolesGuard } from '../../iam/guards/roles.guard';
@@ -17,10 +17,10 @@ export class SalesController {
   constructor(private readonly contractService: ContractService) {}
 
   @Post('quotations/:id/sign')
-  @Roles(Role.GLOBAL_ADMIN, Role.SALE)
+  @Roles(Role.CEO, Role.SALE)
   @UseInterceptors(AuditInterceptor)
   @Audit('sls_contracts', 'SIGN_QUOTATION_AND_INIT_PROJECT')
-  @ApiOperation({ summary: 'Sign quotation with PKI and Init Project (Flow 1 & 2)' })
+  @ApiOperation({ summary: 'Initiate 3-layer signature flow (SALE or CEO as Initiator)' })
   async signQuotationAndCreateContract(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: any
@@ -30,16 +30,41 @@ export class SalesController {
   }
 
   @Get('contracts')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.SALE)
+  @Roles(Role.CEO, Role.PM, Role.SALE)
   @ApiOperation({ summary: 'List all contracts' })
   async listContracts() {
     return this.contractService.findAllContracts();
   }
 
   @Get('contracts/stats')
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.SALE)
+  @Roles(Role.CEO, Role.PM, Role.SALE)
   @ApiOperation({ summary: 'Get contract statistics' })
   async getStats() {
     return this.contractService.getContractStats();
+  }
+
+  @Get('contracts/:id/milestones')
+  @Roles(Role.CEO, Role.PM, Role.SALE)
+  @ApiOperation({ summary: 'Lấy danh sách các mốc giai đoạn (Milestones) của hợp đồng' })
+  async getMilestones(@Param('id', ParseUUIDPipe) id: string) {
+    return this.contractService.getMilestones(id);
+  }
+
+  @Patch('contracts/milestones/:id')
+  @Roles(Role.CEO, Role.SALE)
+  @ApiOperation({ summary: 'Cập nhật trạng thái mốc giai đoạn (Milestones)' })
+  async updateMilestone(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('status') status: string
+  ) {
+    return this.contractService.updateMilestoneStatus(id, status);
+  }
+  @Post('contracts')
+  @Roles(Role.CEO, Role.SALE)
+  @UseInterceptors(AuditInterceptor)
+  @Audit('sls_contracts', 'CREATE_CONTRACT_MANUAL')
+  @ApiOperation({ summary: 'Tạo hợp đồng thủ công (không qua quy trình báo giá)' })
+  async createContract(@Body() data: any) {
+    return this.contractService.createContract(data);
   }
 }

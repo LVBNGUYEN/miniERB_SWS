@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Eye, TrendingUp, Bot, FileText, CheckCircle2, Plus, Download, Check, ShieldCheck, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, TrendingUp, Bot, FileText, CheckCircle2, Plus, Download, Check, ShieldCheck, Zap, Key, Loader2 } from 'lucide-react';
 import Modal from '../../components/Modal';
+import { api } from '../../api';
 
 interface ClientDashboardProps {
   userName: string;
@@ -10,23 +11,61 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<any>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [aiReportId, setAiReportId] = useState<string | null>(null);
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const contracts = [
-    { title: 'Tokyo Tech Expansion Phase 1', date: '20/03/2024', amount: 850000000, status: 'Đang hoạt động', id: 'CON-001' },
-    { title: 'Bản nháp Bảo trì Hệ thống', date: '22/03/2024', amount: 150000000, status: 'Bản nháp', id: 'CON-002' },
-  ];
+  useEffect(() => {
+    fetchContracts();
+  }, []);
+
+  const fetchContracts = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/sales/contracts');
+      if (Array.isArray(data)) {
+        setContracts(data.map((c: any) => ({
+          id: c.id,
+          title: c.quotation?.title || `Hợp đồng ${c.contractNumber}`,
+          date: new Date(c.createdAt).toLocaleDateString('vi-VN'),
+          amount: Number(c.quotation?.totalAmount) || 0,
+          status: c.status === 'VERIFIED' ? 'Đang hoạt động' : 'Chờ Ký Số',
+          contractNumber: c.contractNumber
+        })));
+      }
+    } catch (err) {
+      console.error('Fetch contracts error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
-  const handleCreateProject = () => {
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsProjectModalOpen(false);
-      setIsSuccess(false);
-    }, 1500);
+  const handleCreateProject = async () => {
+    setIsSubmitting(true);
+    try {
+      await api.post('/customer-support/requests', {
+        type: 'PROJECT_INIT',
+        title: 'Yêu cầu Dự án mới từ Khách hàng',
+        description: 'Khởi tạo từ Portal',
+        priority: 'HIGH'
+      });
+      setIsSuccess(true);
+      setTimeout(() => {
+        setIsProjectModalOpen(false);
+        setIsSuccess(false);
+        fetchContracts();
+      }, 1500);
+    } catch (err) {
+      alert('Lỗi khi gửi yêu cầu');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRequestAi = () => {
@@ -52,7 +91,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
           className="flex items-center gap-3 px-6 py-4 bg-accent-blue text-white rounded-2xl font-black text-xs shadow-2xl shadow-blue-500/30 transition-all hover:scale-105 active:scale-95 uppercase tracking-widest border border-white/10 italic"
         >
           <Plus className="w-5 h-5" />
-          <span>Yêu cầu Dự án mới</span>
+          <span>Gửi Yêu Cầu / Ticket</span>
         </button>
       </div>
 
@@ -60,7 +99,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
         {[
           { label: 'Tiến độ Tổng quát', value: '78%', icon: TrendingUp },
           { label: 'Dự án hoàn thành', value: '5', icon: CheckCircle2 },
-          { label: 'Hợp đồng cần ký', value: '2', icon: FileText },
+          { label: 'Hợp đồng cần ký', value: contracts.filter(c => c.status === 'Chờ Ký Số').length.toString(), icon: FileText },
           { label: 'Hỗ trợ 24/7', value: 'ONLINE', icon: Zap },
         ].map((kpi, idx) => (
           <div key={idx} className="bg-bg-card p-6 rounded-3xl border border-border-primary relative overflow-hidden group shadow-xl hover:border-accent-blue/40 transition-all hover:shadow-blue-500/5">
@@ -83,28 +122,40 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
                  <FileText className="w-6 h-6 text-accent-blue" />
                  Lịch sử Hợp đồng & Thanh toán
               </h3>
-              <p className="text-[10px] font-black text-accent-blue underline tracking-widest cursor-pointer hover:text-blue-700 transition-all decoration-accent-blue/40 italic uppercase">XEM TOÀN BỘ KHO LƯU TRỮ</p>
+              <p onClick={fetchContracts} className="text-[10px] font-black text-accent-blue underline tracking-widest cursor-pointer hover:text-blue-700 transition-all decoration-accent-blue/40 italic uppercase">{loading ? 'ĐANG TẢI...' : 'LÀM MỚI DỮ LIỆU'}</p>
            </div>
-           <div className="space-y-4">
-              {contracts.map((c, i) => (
-                 <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-bg-surface/30 rounded-3xl border border-border-primary group hover:border-accent-blue/30 transition-all cursor-pointer hover:bg-bg-card shadow-sm hover:shadow-lg relative overflow-hidden">
-                    <div className="space-y-2 relative z-10">
-                       <p className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-all italic uppercase tracking-tight underline decoration-transparent group-hover:decoration-accent-blue underline-offset-4">{c.title}</p>
-                       <p className="text-[10px] text-text-secondary font-black italic uppercase tracking-widest opacity-60">Ngày ký: {c.date} • Giá trị: <span className="text-text-primary font-black underline decoration-accent-blue/10 underline-offset-2">{formatCurrency(c.amount)}</span></p>
-                    </div>
-                    <div className="flex items-center gap-5 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-border-primary/40 relative z-10 w-full md:w-auto justify-between md:justify-end">
-                       <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase italic tracking-[0.2em] border ${
-                          c.status === 'Đang hoạt động' ? 'bg-status-green/10 text-status-green border-status-green/20 shadow-inner' : 'bg-status-yellow/10 text-status-yellow border-status-yellow/20'
-                       }`}>{c.status}</span>
-                       <button 
-                        onClick={() => setSelectedContract(c)}
-                        className="p-3 bg-bg-surface rounded-2xl border border-border-primary text-text-secondary hover:text-accent-blue hover:border-accent-blue/30 transition-all active:scale-90 shadow-md group-hover:shadow-xl group-hover:scale-110"
-                       >
-                        <Eye className="w-4 h-4" />
-                       </button>
-                    </div>
-                 </div>
-              ))}
+           <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+              {loading ? (
+                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 animate-spin text-accent-blue" /></div>
+              ) : contracts.length === 0 ? (
+                <div className="text-center py-10 opacity-40 italic font-black uppercase tracking-widest text-text-secondary">Chưa có hợp đồng nào được định danh</div>
+              ) : (
+                contracts.map((c, i) => (
+                  <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-bg-surface/30 rounded-3xl border border-border-primary group hover:border-accent-blue/30 transition-all cursor-pointer hover:bg-bg-card shadow-sm hover:shadow-lg relative overflow-hidden">
+                      <div className="space-y-2 relative z-10">
+                        <p className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-all italic uppercase tracking-tight underline decoration-transparent group-hover:decoration-accent-blue underline-offset-4">{c.title}</p>
+                        <p className="text-[10px] text-text-secondary font-black italic uppercase tracking-widest opacity-60">Ngày ký: {c.date} • Giá trị: <span className="text-text-primary font-black underline decoration-accent-blue/10 underline-offset-2">{formatCurrency(c.amount)}</span></p>
+                      </div>
+                      <div className="flex items-center gap-5 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-border-primary/40 relative z-10 w-full md:w-auto justify-between md:justify-end">
+                        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase italic tracking-[0.2em] border ${
+                            c.status === 'Đang hoạt động' 
+                              ? 'bg-status-green/10 text-status-green border-status-green/20 shadow-inner' 
+                              : 'bg-status-yellow/10 text-status-yellow border-status-yellow/20 animate-pulse'
+                        }`}>{c.status}</span>
+                        <button 
+                          onClick={() => setSelectedContract(c)}
+                          className={`p-3 rounded-2xl border transition-all active:scale-90 shadow-md group-hover:shadow-xl group-hover:scale-110 ${
+                            c.status === 'Chờ Ký Số'
+                            ? 'bg-status-yellow text-white border-white/20 hover:bg-yellow-600'
+                            : 'bg-bg-surface text-text-secondary border-border-primary hover:text-accent-blue hover:border-accent-blue/30'
+                          }`}
+                        >
+                          {c.status === 'Chờ Ký Số' ? <ShieldCheck className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                  </div>
+                ))
+              )}
            </div>
            <p className="text-[9px] text-text-secondary font-black uppercase text-center italic opacity-30 mt-4 tracking-[0.4em]">Đã mã hóa dữ liệu tài chính với CA/PKI.</p>
         </div>
@@ -138,15 +189,23 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
         </div>
       </div>
 
-      {/* Request New Project Modal */}
+      {/* Request New Project & Ticket Modal */}
       <Modal 
         isOpen={isProjectModalOpen} 
         onClose={() => setIsProjectModalOpen(false)} 
-        title="Yêu cầu Dự án mới (Project Gateway)"
+        title="Trung tâm Khởi tạo Yêu cầu (Gateway)"
       >
         <div className="space-y-8 p-4">
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1 underline decoration-accent-blue/10">Tên dự án mong muốn</label>
+             <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1 underline decoration-accent-blue/10">Phân loại Yêu cầu</label>
+             <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-3xl text-text-primary outline-none font-black italic focus:border-accent-blue transition-all shadow-inner appearance-none cursor-pointer">
+               <option>Khởi tạo Dự án / Lead mới</option>
+               <option>Ticket: Tính năng hệ thống mới (Feature - Cần Evaluate)</option>
+               <option>Ticket: Sửa lỗi hệ thống (Bug - Miễn phí)</option>
+             </select>
+          </div>
+          <div className="space-y-3">
+            <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1 underline decoration-accent-blue/10">Tên Dự án / Tiêu đề Ticket</label>
             <input 
               type="text" 
               placeholder="VD: Tokyo Tech Phase 3 Expansion..."
@@ -160,26 +219,16 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
               className="w-full h-40 p-5 bg-bg-surface border border-border-primary rounded-3xl text-text-primary outline-none italic font-bold focus:border-accent-blue transition-all shadow-inner leading-relaxed resize-none"
             ></textarea>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Ngân sách dự kiến</label>
-               <input type="text" placeholder="100.000.000..." className="w-full p-5 bg-bg-surface border border-border-primary rounded-3xl text-text-primary outline-none font-black italic focus:border-accent-blue transition-all shadow-inner" />
-            </div>
-            <div className="space-y-3">
-               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Thời gian dự kiến (Giờ)</label>
-               <input type="number" placeholder="160..." className="w-full p-5 bg-bg-surface border border-border-primary rounded-3xl text-text-primary outline-none font-black italic focus:border-accent-blue transition-all shadow-inner" />
-            </div>
-          </div>
           <button 
             onClick={handleCreateProject}
-            disabled={isSuccess}
+            disabled={isSubmitting || isSuccess}
             className={`w-full py-5 rounded-full font-black text-md transition-all flex items-center justify-center gap-4 shadow-2xl active:scale-95 uppercase tracking-[0.3em] italic border border-white/10 ${
               isSuccess 
               ? 'bg-status-green text-white scale-105' 
               : 'bg-accent-blue text-white hover:bg-blue-600 shadow-blue-500/20'
             }`}
           >
-            {isSuccess ? <><Check className="w-7 h-7 animate-bounce shadow-xl" /> <span className="underline decoration-white/20">Đã gửi yêu cầu tới đội ngũ AMIT!</span></> : 'GỬI YÊU CẦU DỰ ÁN'}
+            {isSubmitting ? <Loader2 className="w-7 h-7 animate-spin" /> : isSuccess ? <><Check className="w-7 h-7 animate-bounce shadow-xl" /> <span className="underline decoration-white/20">Đã gửi yêu cầu tới đội ngũ AMIT!</span></> : 'GỬI YÊU CẦU DỰ ÁN'}
           </button>
           <p className="text-[10px] text-text-secondary font-black uppercase text-center italic opacity-40 mt-2 tracking-widest leading-loose">Hệ thống sẽ đồng bộ với Pipeline của đội ngũ Sales chiến lược.</p>
         </div>
@@ -199,7 +248,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
               </div>
               <div className="relative z-10 space-y-2">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 italic">Mã định danh Hợp đồng (PKI ID)</p>
-                <h4 className="text-2xl font-black italic tracking-tighter uppercase">{selectedContract.id}</h4>
+                <h4 className="text-2xl font-black italic tracking-tighter uppercase">{selectedContract.contractNumber || selectedContract.id}</h4>
               </div>
               <Download className="w-10 h-10 opacity-40 group-hover:opacity-100 transition-all cursor-pointer relative z-10 hover:scale-125 hover:rotate-6 active:scale-90" />
             </div>
@@ -213,23 +262,70 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ userName }) => {
                 <span className="text-md font-black text-accent-blue italic tracking-tighter underline decoration-accent-blue/10 underline-offset-4">{formatCurrency(selectedContract.amount)}</span>
               </div>
               <div className="flex justify-between items-center pb-5 border-b border-border-primary group">
-                <span className="text-[10px] font-black text-text-secondary italic uppercase tracking-widest">Tiến độ thanh toán</span>
-                <span className="text-sm font-black text-status-green italic flex items-center gap-2">60% - Đã quyết toán L1, L2 <CheckCircle2 className="w-4 h-4 animate-bounce" /></span>
+                <span className="text-[10px] font-black text-text-secondary italic uppercase tracking-widest">Tiến độ dự án</span>
+                <span className="text-sm font-black text-status-green italic flex items-center gap-2">60% - Đang thực hiện <CheckCircle2 className="w-4 h-4 animate-bounce" /></span>
               </div>
             </div>
-            <div className="bg-bg-surface p-6 rounded-3xl border-l-8 border-accent-blue border border-border-primary shadow-inner relative overflow-hidden group">
-              <div className="flex items-center gap-2 mb-3">
-                 <Bot className="w-4 h-4 text-accent-blue/40" />
-                 <p className="text-[9px] font-black uppercase text-text-secondary tracking-widest italic">Cập nhật bởi PM phụ trách:</p>
+            {selectedContract.status === 'Chờ Ký Số' ? (
+               <div className="bg-bg-surface p-6 rounded-3xl border border-border-primary shadow-2xl relative overflow-hidden group space-y-4">
+                 <div className="space-y-3">
+                   <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em] ml-1">Mã PIN Khóa PKI Khách hàng</label>
+                   <div className="relative group/input">
+                     <input 
+                       type="password" 
+                       placeholder="••••••" 
+                       className="w-full p-4 pr-12 bg-bg-card border border-border-primary rounded-2xl text-text-primary outline-none font-black text-center tracking-[1em] focus:border-status-yellow transition-all shadow-inner" 
+                     />
+                     <Key className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-status-yellow opacity-50 group-focus-within/input:opacity-100 transition-all" />
+                   </div>
+                 </div>
+
+                 <button 
+                   onClick={async () => {
+                      setIsSigning(true);
+                      try {
+                        await api.post('/pki/sign', { 
+                          documentId: selectedContract.contractNumber || selectedContract.id,
+                          documentContent: `Ký duyệt hợp đồng ${selectedContract.title}`
+                        });
+                        setIsSuccess(true);
+                        setTimeout(() => { 
+                          setIsSuccess(false); 
+                          setSelectedContract(null); 
+                          fetchContracts();
+                        }, 1500);
+                      } catch (err) {
+                        alert('Lỗi khi xác thực PKI');
+                      } finally {
+                        setIsSigning(false);
+                      }
+                   }}
+                   disabled={isSigning || isSuccess}
+                   className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] italic transition-all flex items-center justify-center gap-3 shadow-xl border border-white/10 ${
+                     isSuccess 
+                     ? 'bg-status-green text-white shadow-status-green/20' 
+                     : 'bg-status-yellow text-white hover:bg-yellow-600 active:scale-95 shadow-yellow-500/20'
+                   }`}
+                 >
+                   {isSigning ? (
+                     <Loader2 className="w-6 h-6 animate-spin" />
+                   ) : isSuccess ? (
+                     <><Check className="w-6 h-6 animate-bounce shadow-xl" /> <span className="underline decoration-white/20">Xác thực thành công!</span></>
+                   ) : (
+                     'XÁC THỰC KÝ SỐ PKI'
+                   )}
+                 </button>
+               </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button className="py-4 bg-bg-surface text-text-primary rounded-2xl font-black text-[10px] uppercase tracking-widest border border-border-primary hover:bg-slate-700/10 dark:hover:bg-slate-700 transition-all active:scale-95 italic shadow-sm shadow-blue-900/5 flex items-center justify-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> XEM PKI SIG
+                </button>
+                <button className="py-4 bg-accent-blue text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95 italic border border-white/10 flex items-center justify-center gap-2">
+                  <Download className="w-4 h-4" /> TẢI BẢN PDF
+                </button>
               </div>
-              <p className="text-sm text-text-primary font-bold leading-relaxed italic opacity-80 decoration-accent-blue/10 underline underline-offset-4">
-                "Dự án đang đi đúng lộ trình cam kết. Đã bàn giao 4/5 milestone kỹ thuật. Dự thảo nghiệm thu sẽ sẵn sàng vào ngày 30/03 để quyết toán toàn bộ Giai đoạn 1."
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button className="py-4 bg-bg-surface text-text-primary rounded-2xl font-black text-[10px] uppercase tracking-widest border border-border-primary hover:bg-slate-700/10 dark:hover:bg-slate-700 transition-all active:scale-95 italic shadow-sm shadow-blue-900/5">XEM CHỨNG TỪ SỐ (PKI)</button>
-              <button className="py-4 bg-accent-blue text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95 italic border border-white/10">TẢI BẢN PDF HỢP ĐỒNG</button>
-            </div>
+            )}
           </div>
         )}
       </Modal>
