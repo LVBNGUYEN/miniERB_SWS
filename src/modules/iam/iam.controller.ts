@@ -1,5 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards, Param } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, UseGuards, Param, Patch, UseInterceptors } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { IamService } from './iam.service';
 import { SignUpDto } from './dto/sign-up.dto';
@@ -12,12 +12,16 @@ import { Role } from './entities/role.enum';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { OwnershipGuard } from './guards/ownership.guard';
 import { RequireOwnership } from './decorators/require-ownership.decorator';
+import { Audit } from '../sys-audit/decorators/audit.decorator';
+import { AuditInterceptor } from '../sys-audit/interceptors/audit.interceptor';
 
 @ApiTags('IAM')
+@UseInterceptors(AuditInterceptor)
 @Controller('iam')
 export class IamController {
   constructor(private readonly iamService: IamService) {}
 
+  @Audit('iam_users', 'CREATE_USER')
   @Post('sign-up')
   async signUp(@Body() signUpDto: SignUpDto) {
     return this.iamService.signUp(signUpDto);
@@ -28,13 +32,13 @@ export class IamController {
     return this.iamService.signIn(signInDto);
   }
 
-  // ── Refresh Token (public — no JWT guard, uses refresh_token in body) ──
+  // ── Refresh Token (public) ──
   @Post('auth/refresh')
   async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.iamService.refreshTokens(refreshTokenDto);
   }
 
-  // ── Logout (protected — requires valid access token) ──
+  // ── Logout ──
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Post('auth/logout')
@@ -52,7 +56,6 @@ export class IamController {
     return this.iamService.verifyFido2(email, signatureValue);
   }
 
-  // Protected route — any authenticated user
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('profile')
@@ -60,18 +63,14 @@ export class IamController {
     return this.iamService.getProfile(user.userId);
   }
 
-  // Protected route — Role Based Access Control (RBAC)
   @ApiBearerAuth()
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM)
+  @Roles(Role.CEO, Role.PM)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get('admin-board')
   getAdminBoard() {
     return { message: 'Welcome to the admin board' };
   }
 
-  // ── IDOR Test Endpoint ──
-  // Any user can try to access this, but OwnershipGuard will block them 
-  // if they try to access an ID that isn't their own.
   @UseGuards(JwtAuthGuard, OwnershipGuard)
   @RequireOwnership(IamService)
   @Get('user/:id')
@@ -80,10 +79,58 @@ export class IamController {
   }
 
   @ApiBearerAuth()
-  @Roles(Role.GLOBAL_ADMIN, Role.BRANCH_PM, Role.SALE)
+  @Roles(Role.CEO, Role.PM, Role.SALE)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Get('pm-list')
   async listPms() {
     return this.iamService.findPms();
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all users (Admin only)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('users')
+  async findAll() {
+    return this.iamService.findAllUsers();
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy cấu hình bảo mật hệ thống (Admin only)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('settings')
+  async getSettings() {
+    return this.iamService.getSecuritySettings();
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cập nhật cấu hình bảo mật hệ thống (Admin only)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Audit('iam_settings', 'UPDATE_SECURITY_SETTINGS')
+  @Patch('settings')
+  async updateSettings(@Body() updateData: any) {
+    return this.iamService.updateSecuritySettings(updateData);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Khóa hoặc mở khóa người dùng (Admin only)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Audit('iam_users', 'TOGGLE_USER_STATUS')
+  @Patch('user/:id/toggle-status')
+  async toggleStatus(@Param('id') id: string) {
+    return this.iamService.toggleUserStatus(id);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reset mật khẩu người dùng về mặc định (Admin only)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Audit('iam_users', 'RESET_PASSWORD')
+  @Post('user/:id/reset-password')
+  async resetPassword(@Param('id') id: string) {
+    return this.iamService.resetUserPassword(id);
   }
 }

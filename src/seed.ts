@@ -10,10 +10,13 @@ async function bootstrap() {
   console.log('🌱 Bắt đầu gieo Seed Data (Pragmatic QA Style)...');
   const app = await NestFactory.createApplicationContext(AppModule);
   
-  const dataSource = app.get(DataSource);
-  
-  try {
-    // 0. Tạo Branch mẫu
+    const dataSource = app.get(DataSource);
+    
+    try {
+      console.log('⏳ Làm sạch dữ liệu cũ...');
+      await dataSource.query(`TRUNCATE TABLE fin_payments, fin_invoices, fin_vendor_debts, tms_timesheets, prj_tasks, prj_projects, sls_contracts, sls_quotations, iam_users, sys_branches CASCADE`);
+      
+      // 0. Tạo Branch mẫu
     const branchRepository = dataSource.getRepository(Branch);
     console.log('⏳ Mở Chi Nhánh...');
     let hqBranch = await branchRepository.findOne({ where: { code: 'HN-HQ' } });
@@ -27,41 +30,45 @@ async function bootstrap() {
       await branchRepository.save(hqBranch);
     }
 
-    // 1. Tạo Users mẫu (Admin, Vendor, Client)
+    // 1. Tạo Users mẫu chuẩn theo yêu cầu: <role>@amit.vn và client@gmail.com
     const userRepository = dataSource.getRepository(User);
     const hashedPassword = await bcrypt.hash('password123', 10);
     
-    console.log('⏳ Gieo PM, Vendor, Client...');
+    console.log('⏳ Gieo CEO, PM, Sale, Vendor, Client (Standard emails)...');
+    
+    // CEO account
+    let ceo = await userRepository.findOne({ where: { email: 'ceo@amit.vn' } });
+    if (!ceo) {
+      ceo = userRepository.create({
+        fullName: 'Tổng Giám Đốc (CEO)',
+        email: 'ceo@amit.vn',
+        passwordHash: hashedPassword,
+        role: 'CEO',
+        status: 'ACTIVE',
+        branchId: hqBranch.id,
+      });
+      await userRepository.save(ceo);
+    }
+
+    // PM account
     let pm = await userRepository.findOne({ where: { email: 'pm@amit.vn' } });
     if (!pm) {
       pm = userRepository.create({
-        fullName: 'Quản Lý Dự Án SWS (Admin)',
+        fullName: 'Quản Lý Dự Án (PM)',
         email: 'pm@amit.vn',
         passwordHash: hashedPassword,
-        role: 'GLOBAL_ADMIN',
+        role: 'PM',
         status: 'ACTIVE',
         branchId: hqBranch.id,
       });
       await userRepository.save(pm);
     }
 
-    let branchPm = await userRepository.findOne({ where: { email: 'branch_pm@amit.vn' } });
-    if (!branchPm) {
-      branchPm = userRepository.create({
-        fullName: 'Project Manager (Chi nhánh)',
-        email: 'branch_pm@amit.vn',
-        passwordHash: hashedPassword,
-        role: 'BRANCH_PM',
-        status: 'ACTIVE',
-        branchId: hqBranch.id,
-      });
-      await userRepository.save(branchPm);
-    }
-
+    // Sale account
     let sale = await userRepository.findOne({ where: { email: 'sale@amit.vn' } });
     if (!sale) {
       sale = userRepository.create({
-        fullName: 'Kinh Doanh SWS',
+        fullName: 'Phòng Kinh Doanh (SALE)',
         email: 'sale@amit.vn',
         passwordHash: hashedPassword,
         role: 'SALE',
@@ -71,10 +78,11 @@ async function bootstrap() {
       await userRepository.save(sale);
     }
 
+    // Vendor account
     let vendor = await userRepository.findOne({ where: { email: 'vendor@amit.vn' } });
     if (!vendor) {
       vendor = userRepository.create({
-        fullName: 'Bùi Anh Tuấn (Vendor)',
+        fullName: 'Đối Tác / Lập Trình Viên (VENDOR)',
         email: 'vendor@amit.vn',
         passwordHash: hashedPassword,
         role: 'VENDOR',
@@ -84,11 +92,12 @@ async function bootstrap() {
       await userRepository.save(vendor);
     }
 
-    let client = await userRepository.findOne({ where: { email: 'client@vcb.com' } });
+    // Client account
+    let client = await userRepository.findOne({ where: { email: 'client@gmail.com' } });
     if (!client) {
       client = userRepository.create({
-        fullName: 'Đại diện Vietcombank',
-        email: 'client@vcb.com',
+        fullName: 'Khách Hàng (CLIENT)',
+        email: 'client@gmail.com',
         passwordHash: hashedPassword,
         role: 'CLIENT',
         status: 'ACTIVE',
@@ -115,23 +124,22 @@ async function bootstrap() {
       });
       await quotationRepository.save(quotation);
     } else {
-      // Reset for testing
-      quotation.status = 'DRAFT';
-      await quotationRepository.save(quotation);
-      
       // Cleanup existing test artifacts
-      // PN: Using TRUNCATE with CASCADE to safely clear the transaction chain for a fresh test run.
       await dataSource.query(`TRUNCATE TABLE fin_payments, fin_invoices, fin_vendor_debts, tms_timesheets, prj_tasks, prj_projects, sls_contracts CASCADE`);
       
-      // Reset for testing
+      // Update references to new client/pm
+      quotation.clientId = client.id;
+      quotation.pmId = pm.id;
       quotation.status = 'DRAFT';
       await quotationRepository.save(quotation);
     }
 
     console.log('✅ Gieo Data XONG! Dữ liệu của bạn:');
-    console.log(`- Bạn có thể Login bằng: pm@amit.vn / password123`);
-    console.log(`- Quotation ID để test Luồng 1 (Ký PKI CA): ${quotation.id}`);
-    console.log(`- Vendor ID để test Luồng 3 (Gán Task): ${vendor.id}`);
+    console.log(`- CEO: ceo@amit.vn`);
+    console.log(`- PM: pm@amit.vn`);
+    console.log(`- SALE: sale@amit.vn`);
+    console.log(`- VENDOR: vendor@amit.vn`);
+    console.log(`- CLIENT: client@gmail.com`);
     
   } catch (error) {
     console.error('❌ Lỗi khi gieo Seed:', error);

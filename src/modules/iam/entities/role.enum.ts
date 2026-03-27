@@ -1,6 +1,6 @@
 export enum Role {
-  GLOBAL_ADMIN = 'GLOBAL_ADMIN',
-  BRANCH_PM = 'BRANCH_PM',
+  CEO = 'CEO',
+  PM = 'PM',
   VENDOR = 'VENDOR',
   CLIENT = 'CLIENT',
   SALE = 'SALE',

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
+import { SecuritySetting } from './entities/security-setting.entity';
 import { Branch } from '../system/entities/branch.entity';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
@@ -19,6 +20,8 @@ export class IamService implements OwnershipValidator {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(SecuritySetting)
+    private readonly securitySettingRepository: Repository<SecuritySetting>,
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     private readonly jwtService: JwtService,
@@ -218,16 +221,52 @@ export class IamService implements OwnershipValidator {
 
   async findAllUsers() {
     return this.userRepository.find({
-      select: ['id', 'email', 'fullName', 'role'],
+      select: ['id', 'email', 'fullName', 'role', 'status'],
       order: { fullName: 'ASC' }
     });
   }
 
   async findPms() {
     return this.userRepository.find({
-      where: { role: 'BRANCH_PM' },
+      where: { role: 'PM' },
       select: ['id', 'email', 'fullName'],
       order: { fullName: 'ASC' }
     });
+  }
+
+  async getSecuritySettings(): Promise<SecuritySetting> {
+    let setting = await this.securitySettingRepository.findOne({ where: {} });
+    if (!setting) {
+      setting = this.securitySettingRepository.create({
+        mfaEnabled: true,
+        ipWhitelisting: '127.0.0.1, 192.168.1.1',
+        sessionTimeout: 12,
+        apiKeyActive: true,
+      });
+      await this.securitySettingRepository.save(setting);
+    }
+    return setting;
+  }
+
+  async updateSecuritySettings(updateData: Partial<SecuritySetting>): Promise<SecuritySetting> {
+    const setting = await this.getSecuritySettings();
+    Object.assign(setting, updateData);
+    return this.securitySettingRepository.save(setting);
+  }
+
+  async toggleUserStatus(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.status = user.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE';
+    return this.userRepository.save(user);
+  }
+
+  async resetUserPassword(userId: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const defaultPasswordHash = await bcrypt.hash('reset123456', 10);
+    user.passwordHash = defaultPasswordHash;
+    await this.userRepository.save(user);
+    return { message: 'Password has been reset to reset123456' };
   }
 }

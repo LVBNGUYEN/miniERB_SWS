@@ -39,7 +39,7 @@ export class OwnershipGuard implements CanActivate {
 
     // --- ADMINISTRATIVE OVERRIDE ---
     // If the user is a GLOBAL_ADMIN, they can bypass ownership checks
-    if (user.role === 'GLOBAL_ADMIN') {
+    if (user.role === 'CEO') {
         return true;
     }
 

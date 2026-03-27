@@ -12,7 +12,7 @@ export class BranchGuard implements CanActivate {
     }
 
     // Admin can see everything
-    if (user.role === Role.GLOBAL_ADMIN) {
+    if (user.role === Role.CEO) {
       return true;
     }
 
