@@ -9,7 +9,10 @@ import { SignInDto } from './dto/sign-in.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { OwnershipValidator } from './interfaces/ownership-validator.interface';
+import { SysAuditService } from '../sys-audit/sys-audit.service';
+import { CreateVendorDto } from './dto/create-vendor.dto';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'super-secret-refresh-key';
 const REFRESH_TOKEN_EXPIRY = '7d';
@@ -22,6 +25,7 @@ export class IamService implements OwnershipValidator {
     @InjectRepository(Branch)
     private readonly branchRepository: Repository<Branch>,
     private readonly jwtService: JwtService,
+    private readonly sysAuditService: SysAuditService,
   ) {}
 
   // ──────────────────────────────────────────────
@@ -85,7 +89,58 @@ export class IamService implements OwnershipValidator {
   }
 
   // ──────────────────────────────────────────────
+  //  Create Vendor (Admin only)
+  // ──────────────────────────────────────────────
+  async createVendor(adminId: string, dto: CreateVendorDto) {
+    const existingUser = await this.userRepository.findOne({ where: { email: dto.email } });
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    // Sinh mật khẩu ngẫu nhiên (dùng crypto.randomBytes để đảm bảo an toàn)
+    const rawPassword = crypto.randomBytes(6).toString('base64url').slice(0, 8);
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+    const user = this.userRepository.create({
+      email: dto.email,
+      fullName: dto.fullName,
+      passwordHash,
+      role: 'VENDOR',
+      skills: dto.skills,
+      hourlyRate: dto.hourlyRate,
+      actorType: 'HUMAN',
+      status: 'ACTIVE',
+    });
+
+    await this.userRepository.save(user);
+
+    // Ghi Audit
+    await this.sysAuditService.createLog({
+      userId: adminId,
+      action: 'CREATE',
+      tableName: 'iam_users',
+      recordId: user.id,
+      oldValue: null,
+      newValue: { email: user.email, role: user.role, hourlyRate: user.hourlyRate },
+      actorType: 'HUMAN',
+    });
+
+    return {
+      message: 'Vendor created successfully',
+      vendorId: user.id,
+      // Note: temporaryPassword is NOT returned in the response for security.
+      // Deliver via email/notification system.
+    };
+  }
+
+  // ──────────────────────────────────────────────
   //  Sign In — returns access_token + refresh_token
+  //  • Lockout after 5 failed attempts (15 min)
+  //  • Audit logged on success and failure
+  //  • FE routing: use `user.role` to redirect:
+  //      GLOBAL_ADMIN  → /admin
+  //      BRANCH_PM     → /pm
+  //      VENDOR        → /vendor
   // ──────────────────────────────────────────────
   async signIn(signInDto: SignInDto) {
     const { email, password } = signInDto;
@@ -99,10 +154,48 @@ export class IamService implements OwnershipValidator {
       throw new UnauthorizedException('User is blocked/inactive');
     }
 
+    // ——— Lockout check ———
+    // Wrap in new Date() to normalize in case ORM returns a string (e.g. SQLite)
+    if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+      const remainingMs = new Date(user.lockedUntil).getTime() - Date.now();
+      const remainingMin = Math.ceil(remainingMs / 60000);
+      throw new UnauthorizedException(
+        `Account temporarily locked. Try again in ${remainingMin} minute(s).`,
+      );
+    }
+
+    // ——— Password validation ———
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      const newAttempts = (user.loginAttempts ?? 0) + 1;
+      const updates: Partial<User> = { loginAttempts: newAttempts };
+
+      if (newAttempts >= 5) {
+        updates.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        updates.loginAttempts = 0; // reset counter so next window starts fresh
+      }
+
+      await this.userRepository.update(user.id, updates);
+
+      // Audit: failed login (note: if lockout triggered, loginAttempts was reset to 0 in DB)
+      await this.sysAuditService.createLog({
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        tableName: 'iam_users',
+        recordId: user.id,
+        oldValue: null,
+        newValue: {
+          email: user.email,
+          attempt: newAttempts >= 5 ? 'LOCKOUT_TRIGGERED' : newAttempts,
+        },
+        actorType: 'HUMAN',
+      });
+
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // ——— Success: reset lockout counters ———
+    await this.userRepository.update(user.id, { loginAttempts: 0, lockedUntil: null });
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -112,9 +205,18 @@ export class IamService implements OwnershipValidator {
     };
 
     const tokens = await this.generateTokens(payload);
-
-    // Save hashed refresh token to DB
     await this.updateRefreshTokenHash(user.id, tokens.refresh_token);
+
+    // Audit: successful login
+    await this.sysAuditService.createLog({
+      userId: user.id,
+      action: 'LOGIN',
+      tableName: 'iam_users',
+      recordId: user.id,
+      oldValue: null,
+      newValue: { email: user.email, role: user.role },
+      actorType: 'HUMAN',
+    });
 
     return {
       ...tokens,
