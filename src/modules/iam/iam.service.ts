@@ -141,7 +141,7 @@ export class IamService implements OwnershipValidator {
   //  • Lockout after 5 failed attempts (15 min)
   //  • Audit logged on success and failure
   //  • FE routing: use `user.role` to redirect:
-  //      GLOBAL_ADMIN  → /admin
+  //      CEO           → /admin
   //      BRANCH_PM     → /pm
   //      VENDOR        → /vendor
   // ──────────────────────────────────────────────
