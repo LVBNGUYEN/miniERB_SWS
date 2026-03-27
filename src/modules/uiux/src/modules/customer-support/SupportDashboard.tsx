@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import TaskRequestFlow from '../projects/TaskRequestFlow';
 import Modal from '../../components/Modal';
 import { 
@@ -17,37 +17,99 @@ import {
   PhoneCall,
   Mail,
   History,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
+import { getCookie } from '../../utils/cookie';
+import { Role } from '../../../../iam/entities/role.enum';
+import { api } from '../../api';
 
 const SupportDashboard: React.FC = () => {
+  const userStr = getCookie('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const role = user?.role;
+  const isClient = role === Role.CLIENT;
+
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [newTicket, setNewTicket] = useState({ subject: '', priority: 'Trung bình' });
+  const [newTicket, setNewTicket] = useState({ 
+    clientId: isClient ? user?.id : '', 
+    subject: '', 
+    priority: 'Trung bình',
+    type: 'Lỗi kỹ thuật hệ thống'
+  });
 
-  const tickets = [
-    { client: 'Tokyo Tech Solution', subject: 'Lỗi đồng bộ API Phase 2', priority: 'Cao', status: 'Đang xử lý', time: '10 phút trước', id: 'TK-2026-001' },
-    { client: 'VNG Group', subject: 'Cần hướng dẫn PKI CA', priority: 'Trung bình', status: 'Mới mở', time: '1 giờ trước', id: 'TK-2026-002' },
-    { client: 'Viettel', subject: 'Thanh toán hóa đơn trễ', priority: 'Cao', status: 'Khẩn cấp', time: '2 giờ trước', id: 'TK-2026-003' },
-    { client: 'FPT Software', subject: 'Cài đặt môi trường UAT', priority: 'Thanh thấp', status: 'Đã đóng', time: 'Hôm qua', id: 'TK-2026-004' },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const handleCreateTicket = () => {
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsModalOpen(false);
-      setIsSuccess(false);
-      setNewTicket({ subject: '', priority: 'Trung bình' });
-    }, 1500);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [ticketRes, clientRes] = await Promise.all([
+        api.get('/support/tickets/me'), // Use user context in backend
+        api.post('/iam/user/list', { role: Role.CLIENT })
+      ]);
+      setTickets(Array.isArray(ticketRes) ? ticketRes : []);
+      setClients(Array.isArray(clientRes) ? clientRes : []);
+    } catch (err) {
+      console.error('Fetch support data error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(t => 
+      t.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      t.clientName?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [tickets, searchTerm]);
+
+  const handleCreateTicket = async () => {
+    try {
+      await api.post('/support/tickets', {
+        clientId: isClient ? user?.id : newTicket.clientId,
+        title: newTicket.subject,
+        priority: newTicket.priority,
+        type: newTicket.type
+      });
+      setIsSuccess(true);
+      fetchData();
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setIsSuccess(false);
+        setNewTicket({ clientId: isClient ? user?.id : '', subject: '', priority: 'Trung bình', type: 'Lỗi kỹ thuật hệ thống' });
+      }, 1500);
+    } catch (err) {
+      alert('Lỗi khi gửi yêu cầu hỗ trợ.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 text-accent-blue animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in slide-in-from-top-10 duration-700">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight italic underline decoration-accent-blue/20 underline-offset-8">Cổng hỗ trợ khách hàng (CRM)</h2>
-          <p className="text-text-secondary text-sm font-medium mt-3 italic">Quản lý Ticket, SLA và mức độ hài lòng của khách hàng trên toàn cầu.</p>
+          <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight italic underline decoration-accent-blue/20 underline-offset-8">
+            {isClient ? 'Yêu cầu Hỗ trợ & Kỹ thuật' : 'Cổng hỗ trợ khách hàng (CRM)'}
+          </h2>
+          <p className="text-text-secondary text-sm font-medium mt-3 italic">
+            {isClient ? 'Gửi yêu cầu hỗ trợ và theo dõi tiến độ xử lý trực tiếp.' : 'Quản lý Ticket, SLA và mức độ hài lòng của khách hàng trên toàn cầu.'}
+          </p>
         </div>
         <div className="flex gap-3">
           <button 
@@ -55,7 +117,7 @@ const SupportDashboard: React.FC = () => {
             className="flex items-center gap-2 px-6 py-3 bg-accent-blue text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-blue-500/25 active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>Tạo Ticket mới</span>
+            <span>{isClient ? 'Gửi Ticket mới' : 'Tạo Ticket hộ khách'}</span>
           </button>
         </div>
       </div>
@@ -95,19 +157,28 @@ const SupportDashboard: React.FC = () => {
            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border-primary">
               <h3 className="text-lg font-black text-text-primary flex items-center gap-3 uppercase tracking-tight italic underline decoration-accent-blue/10">
                  <LifeBuoy className="w-6 h-6 text-accent-blue" />
-                 Điều phối Ticket hỗ trợ
+                 {isClient ? 'Lịch sử yêu cầu của bạn' : 'Điều phối Ticket hỗ trợ'}
               </h3>
               <div className="flex items-center gap-4 w-full md:w-auto">
                  <div className="flex-1 md:w-64 bg-bg-surface rounded-xl px-4 py-2 flex items-center gap-2 border border-border-primary shadow-inner">
                     <Search className="w-4 h-4 text-text-secondary" />
-                    <input type="text" placeholder="Tìm ID ticket, khách hàng..." className="bg-transparent text-[11px] outline-none text-text-primary w-full font-bold italic" />
+                    <input 
+                      type="text" 
+                      placeholder="Tìm tiêu đề, khách hàng..." 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-transparent text-[11px] outline-none text-text-primary w-full font-bold italic" 
+                    />
                  </div>
                  <button className="p-2.5 bg-bg-surface text-text-secondary hover:text-text-primary rounded-xl transition-all border border-border-primary hover:border-accent-blue/30 shadow-sm active:scale-90"><Filter className="w-4 h-4" /></button>
               </div>
            </div>
 
            <div className="space-y-4">
-              {tickets.map((t, i) => (
+              {filteredTickets.length === 0 ? (
+                 <div className="py-20 text-center text-xs font-black text-text-secondary uppercase italic opacity-40">Hệ thống chưa ghi nhận ticket nào phù hợp.</div>
+              ) : (
+                filteredTickets.map((t, i) => (
                 <div key={i} className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-bg-surface/40 rounded-3xl border border-border-primary hover:bg-bg-card hover:border-accent-blue/30 transition-all group cursor-pointer shadow-sm relative overflow-hidden">
                    <div className={`absolute top-0 left-0 w-1.5 h-full transition-all group-hover:w-2 ${
                       t.priority === 'Cao' ? 'bg-status-red' : 
@@ -115,22 +186,23 @@ const SupportDashboard: React.FC = () => {
                    }`}></div>
                    
                    <div className="flex flex-col items-start md:items-center gap-1 w-full md:w-24 shrink-0 md:pr-4 border-b md:border-b-0 md:border-r border-border-primary/50 pb-3 md:pb-0">
-                      <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{t.id}</span>
-                      <span className="text-[9px] text-text-secondary font-black italic opacity-60 uppercase">{t.time}</span>
+                      <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">{t.id?.slice(-8).toUpperCase() || `TK-${i}`}</span>
+                      <span className="text-[9px] text-text-secondary font-black italic opacity-60 uppercase">{new Date(t.createdAt).toLocaleTimeString()}</span>
                    </div>
 
                    <div className="flex-1 space-y-2">
-                      <h4 className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-colors font-sans italic tracking-tight uppercase leading-relaxed">{t.subject}</h4>
+                      <h4 className="text-sm font-black text-text-primary group-hover:text-accent-blue transition-colors font-sans italic tracking-tight uppercase leading-relaxed">{t.title}</h4>
                       <p className="text-[10px] text-text-secondary font-black flex items-center gap-1.5 italic uppercase opacity-70">
-                         <User className="w-3.5 h-3.5" /> Khách hàng: <span className="text-text-primary font-black decoration-accent-blue/30 underline">{t.client}</span> • Nhân sự phụ trách: Team A
+                         <User className="w-3.5 h-3.5" /> 
+                         {isClient ? 'Trạng thái xử lý' : `Khách hàng: ${t.clientName || 'Internal'}`} • Loại: {t.type}
                       </p>
                    </div>
 
                    <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-border-primary/50">
                       <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] italic border ${
                          t.status === 'Khẩn cấp' ? 'bg-status-red/10 text-status-red border-status-red/20 animate-pulse' :
-                         t.status === 'Mới mở' ? 'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner' :
-                         t.status === 'Đã đóng' ? 'bg-bg-surface text-text-secondary border-border-primary/50 opacity-40' :
+                         t.status === 'PENDING' ? 'bg-accent-blue/10 text-accent-blue border-accent-blue/20 shadow-inner' :
+                         t.status === 'CLOSED' ? 'bg-bg-surface text-text-secondary border-border-primary/50 opacity-40' :
                          'bg-status-yellow/10 text-status-yellow border-status-yellow/20'
                       }`}>
                          {t.status}
@@ -140,7 +212,8 @@ const SupportDashboard: React.FC = () => {
                       </button>
                    </div>
                 </div>
-              ))}
+                ))
+              )}
            </div>
 
            <button className="w-full py-4 bg-bg-surface text-text-secondary hover:text-accent-blue rounded-2xl font-black text-[10px] transition-all border border-border-primary shadow-xl hover:shadow-2xl active:scale-[0.98] uppercase tracking-[0.3em] italic ring-4 ring-transparent hover:ring-accent-blue/5">
@@ -205,18 +278,23 @@ const SupportDashboard: React.FC = () => {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title="Tạo Ticket Hỗ trợ mới"
+        title={isClient ? "Gửi Yêu cầu Hỗ trợ mới" : "Tạo Ticket Hỗ trợ hộ Khách"}
       >
         <div className="space-y-8 p-4">
-          <div className="space-y-3">
-            <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Chọn Khách hàng chiến lược</label>
-            <select className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner">
-              <option>Tokyo Tech Solution</option>
-              <option>VNG Group</option>
-              <option>Viettel</option>
-              <option>FPT Software</option>
-            </select>
-          </div>
+          {!isClient && (
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Chọn Khách hàng (Tạo hộ)</label>
+              <select 
+                value={newTicket.clientId}
+                onChange={(e) => setNewTicket({...newTicket, clientId: e.target.value})}
+                className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner"
+              >
+                <option value="">Chọn khách hàng...</option>
+                {clients.map((c, i) => <option key={i} value={c.id}>{c.fullName}</option>)}
+              </select>
+            </div>
+          )}
+          
           <div className="space-y-3">
             <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Tiêu đề yêu cầu</label>
             <input 
@@ -230,7 +308,11 @@ const SupportDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-3">
               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Mức độ ưu tiên</label>
-              <select className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner">
+              <select 
+                value={newTicket.priority}
+                onChange={(e) => setNewTicket({...newTicket, priority: e.target.value})}
+                className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner"
+              >
                 <option>Thấp</option>
                 <option>Trung bình</option>
                 <option>Cao</option>
@@ -239,7 +321,11 @@ const SupportDashboard: React.FC = () => {
             </div>
             <div className="space-y-3">
               <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.3em] italic ml-1">Phân loại hỗ trợ</label>
-              <select className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner">
+              <select 
+                value={newTicket.type}
+                onChange={(e) => setNewTicket({...newTicket, type: e.target.value})}
+                className="w-full p-5 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-black italic appearance-none cursor-pointer focus:border-accent-blue transition-all shadow-inner"
+              >
                 <option>Lỗi kỹ thuật hệ thống</option>
                 <option>Yêu cầu tính năng mới</option>
                 <option>Tư vấn Tài chính/Hợp đồng</option>
@@ -249,7 +335,7 @@ const SupportDashboard: React.FC = () => {
           </div>
           <button 
             onClick={handleCreateTicket}
-            disabled={isSuccess || !newTicket.subject}
+            disabled={isSuccess || !newTicket.subject || (!isClient && !newTicket.clientId)}
             className={`w-full py-5 rounded-3xl font-black text-md transition-all flex items-center justify-center gap-4 shadow-2xl active:scale-95 uppercase tracking-[0.2em] italic ${
               isSuccess 
               ? 'bg-status-green text-white scale-105' 

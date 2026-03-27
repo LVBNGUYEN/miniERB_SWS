@@ -65,6 +65,35 @@ const FinanceDashboard: React.FC = () => {
     if (pid) fetchPnl(pid);
   };
 
+  const handleExport = () => {
+    if (!pnl) {
+      alert('Không có dữ liệu P&L để xuất báo cáo.');
+      return;
+    }
+
+    const headers = ['Metric', 'Value'];
+    const data = [
+      ['Dự án', projects.find((p: any) => p.id === selectedProjectId)?.name || 'N/A'],
+      ['Giá trị hợp đồng', pnl.contractAmount || 0],
+      ['Tổng giờ công', pnl.totalApprovedHours || 0],
+      ['Chi phí nhân sự thực tế', pnl.totalActualCost || 0],
+      ['Lợi nhuận gộp thực tế', pnl.netProfit || 0],
+      ['Biên lợi nhuận gộp (%)', `${Number(pnl.profitMarginPercent || 0).toFixed(2)}%`]
+    ];
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n"
+      + data.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Bao_cao_Tai_chinh.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const formatCurrency = (amount: number) => {
      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
@@ -93,7 +122,10 @@ const FinanceDashboard: React.FC = () => {
           <p className="text-text-secondary text-sm font-medium mt-1">Quản lý dòng tiền và quy trình tài chính tự động hóa 100%.</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-bg-card border border-border-primary text-text-primary rounded-xl font-bold text-sm hover:bg-slate-700/10 dark:hover:bg-slate-700 transition-all shadow-lg active:scale-95 italic">
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-2 px-5 py-2.5 bg-bg-card border border-border-primary text-text-primary rounded-xl font-bold text-sm hover:bg-slate-700/10 dark:hover:bg-slate-700 transition-all shadow-lg active:scale-95 italic"
+          >
             <Download className="w-4 h-4 text-text-secondary" />
             <span>Xuất báo cáo tài chính</span>
           </button>

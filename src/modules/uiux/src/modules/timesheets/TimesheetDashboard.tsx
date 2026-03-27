@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/Modal';
 import { 
   Clock, 
@@ -11,44 +11,84 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
-  Check
+  Check,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { getCookie } from '../../utils/cookie';
 import { Role } from '../../../../iam/entities/role.enum';
+import { api } from '../../api';
 
 const TimesheetDashboard: React.FC = () => {
   const userStr = getCookie('user');
   const user = userStr ? JSON.parse(userStr) : null;
-  const isPM = user?.role === Role.BRANCH_PM;
+  const isPM = user?.role === Role.PM;
   const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
-  const [timesheetData, setTimesheetData] = useState([
-    { date: '2026-03-23', project: 'SkyLine ERP', task: 'Phân tích Business Process', hours: 8, status: 'Phê duyệt' },
-    { date: '2026-03-22', project: 'Mobile Banking V2', task: 'Fix bug UI login', hours: 4, status: 'Phê duyệt' },
-    { date: '2026-03-21', project: 'Core Banking API', task: 'Viết tài liệu Swagger', hours: 6, status: 'Chờ duyệt' },
-    { date: '2026-03-20', project: 'AI Chatbot', task: 'Training model GPT-4', hours: 8, status: 'Phê duyệt' },
-  ]);
-
+  const [timesheetData, setTimesheetData] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterProject, setFilterProject] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(3);
-  const [newLog, setNewLog] = useState({ project: 'SkyLine ERP', task: '', hours: 8 });
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [newLog, setNewLog] = useState({ projectId: '', task: '', hours: 8 });
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleAddLog = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const item = { 
-      ...newLog, 
-      date: today, 
-      status: 'Chờ duyệt', 
-      hours: Number(newLog.hours) 
-    };
-    setTimesheetData([item, ...timesheetData]);
-    setIsSuccess(true);
-    setTimeout(() => {
-      setIsModalOpen(false);
-      setIsSuccess(false);
-      setNewLog({ project: 'SkyLine ERP', task: '', hours: 8 });
-    }, 1500);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [tmsRes, projRes] = await Promise.all([
+        api.get('/tms/me'),
+        api.post('/projects/list', {})
+      ]);
+      setTimesheetData(Array.isArray(tmsRes) ? tmsRes : []);
+      setProjects(Array.isArray(projRes) ? projRes : []);
+    } catch (err) {
+      console.error('Fetch timesheet data error:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const filteredData = useMemo(() => {
+    return timesheetData.filter(item => {
+      const matchesSearch = item.taskName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           item.projectName?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesProject = filterProject === 'ALL' || item.projectId === filterProject;
+      return matchesSearch && matchesProject;
+    });
+  }, [timesheetData, searchTerm, filterProject]);
+
+  const handleAddLog = async () => {
+    try {
+      await api.post('/tms', {
+        ...newLog,
+        date: new Date().toISOString()
+      });
+      setIsSuccess(true);
+      fetchData();
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setIsSuccess(false);
+        setNewLog({ projectId: '', task: '', hours: 8 });
+      }, 1500);
+    } catch (err) {
+      alert('Lỗi khi ghi nhận chấm công.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 text-accent-blue animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in zoom-in-95 duration-500">
@@ -114,12 +154,22 @@ const TimesheetDashboard: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         {/* Weekly Timesheet View */}
         <div className="xl:col-span-2 bg-bg-card rounded-2xl border border-border-primary p-8 space-y-6">
-           <div className="flex items-center justify-between pb-4 border-b border-border-primary">
-              <h3 className="text-lg font-bold text-text-primary uppercase tracking-tight">Thống kê tuần này</h3>
+           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border-primary">
+              <h3 className="text-lg font-bold text-text-primary uppercase tracking-tight italic">Thống kê tuần này</h3>
               <div className="flex gap-2">
+                 <div className="bg-bg-surface border border-border-primary rounded-xl px-3 py-1.5 flex items-center gap-2 shadow-inner">
+                    <Search className="w-3.5 h-3.5 text-text-secondary" />
+                    <input 
+                      type="text" 
+                      placeholder="Tìm task/dự án..." 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="bg-transparent text-[11px] outline-none text-text-primary w-24 md:w-40 font-bold italic" 
+                    />
+                 </div>
                  <button 
                    onClick={() => {
-                     const csv = "Date,Project,Task,Hours,Status\n" + timesheetData.map(d => `${d.date},${d.project},${d.task},${d.hours},${d.status}`).join("\n");
+                     const csv = "Date,Project,Task,Hours,Status\n" + filteredData.map(d => `${d.date},${d.projectName},${d.taskName},${d.hours},${d.status}`).join("\n");
                      const blob = new Blob([csv], { type: 'text/csv' });
                      const url = window.URL.createObjectURL(blob);
                      const a = document.createElement('a');
@@ -127,11 +177,10 @@ const TimesheetDashboard: React.FC = () => {
                      a.setAttribute('download', 'timesheet_export.csv');
                      a.click();
                    }}
-                   className="text-xs font-bold px-3 py-1.5 bg-bg-surface text-text-secondary rounded-lg border border-border-primary hover:text-text-primary transition-all"
+                   className="text-xs font-bold px-3 py-1.5 bg-bg-surface text-text-secondary rounded-lg border border-border-primary hover:text-text-primary transition-all shadow-sm italic"
                  >
                    Xuất Excel
                  </button>
-                 <button className="text-xs font-bold px-3 py-1.5 bg-accent-blue text-white rounded-lg hover:bg-blue-600 transition-all">Xem chi tiết</button>
               </div>
            </div>
 
@@ -148,26 +197,36 @@ const TimesheetDashboard: React.FC = () => {
            </div>
 
            <div className="pt-8 border-t border-border-primary space-y-4">
-              <h4 className="text-sm font-bold text-text-secondary">Lịch sử chấm công gần đây</h4>
+              <h4 className="text-sm font-bold text-text-secondary italic flex items-center justify-between">
+                 <span>Lịch sử chấm công gần đây ({filteredData.length})</span>
+                 <select 
+                   value={filterProject}
+                   onChange={(e) => setFilterProject(e.target.value)}
+                   className="bg-transparent text-[10px] font-black uppercase text-accent-blue outline-none cursor-pointer"
+                 >
+                    <option value="ALL">Tất cả dự án</option>
+                    {projects.map((p, i) => <option key={i} value={p.id}>{p.name}</option>)}
+                 </select>
+              </h4>
               <div className="space-y-3">
-                {timesheetData.map((item, i) => (
+                {filteredData.map((item, i) => (
                   <div key={i} className="flex items-center justify-between p-4 bg-bg-surface/60 rounded-xl border border-border-primary hover:border-accent-blue/30 transition-all group">
                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 bg-bg-surface rounded-xl border border-border-primary flex items-center justify-center text-text-secondary group-hover:text-accent-blue transition-colors">
+                        <div className="w-10 h-10 bg-bg-surface rounded-xl border border-border-primary flex items-center justify-center text-text-secondary group-hover:text-accent-blue transition-colors shadow-sm">
                            <Clock className="w-5 h-5" />
                         </div>
                         <div>
-                           <p className="text-sm font-bold text-text-primary group-hover:text-accent-blue transition-colors">{item.project}</p>
-                           <p className="text-xs text-text-secondary italic">{item.task}</p>
+                           <p className="text-sm font-bold text-text-primary group-hover:text-accent-blue transition-colors italic">{item.projectName}</p>
+                           <p className="text-xs text-text-secondary italic">{item.taskName}</p>
                         </div>
                      </div>
                      <div className="flex items-center gap-8">
                         <div className="text-right">
-                           <p className="text-sm font-black text-text-primary">{item.hours}h</p>
-                           <p className="text-[10px] text-text-secondary font-medium uppercase">{item.date}</p>
+                           <p className="text-sm font-black text-text-primary italic">{item.hours}h</p>
+                           <p className="text-[10px] text-text-secondary font-black uppercase italic opacity-60 tracking-widest">{new Date(item.date).toLocaleDateString('vi-VN')}</p>
                         </div>
-                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                           item.status === 'Phê duyệt' ? 'bg-status-green/10 text-status-green' : 'bg-status-yellow/10 text-status-yellow'
+                        <div className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest italic border ${
+                           item.status === 'APPROVED' ? 'bg-status-green/10 text-status-green border-status-green/20' : 'bg-status-yellow/10 text-status-yellow border-status-yellow/20'
                         }`}>
                            {item.status}
                         </div>
@@ -242,14 +301,12 @@ const TimesheetDashboard: React.FC = () => {
           <div className="space-y-2">
             <label className="text-xs font-black text-text-secondary uppercase tracking-widest">Dự án</label>
             <select 
-              value={newLog.project}
-              onChange={(e) => setNewLog({ ...newLog, project: e.target.value })}
-              className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary focus:ring-2 focus:ring-accent-blue outline-none font-bold"
+              value={newLog.projectId}
+              onChange={(e) => setNewLog({ ...newLog, projectId: e.target.value })}
+              className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary focus:ring-2 focus:ring-accent-blue outline-none font-bold italic"
             >
-              <option value="SkyLine ERP">SkyLine ERP</option>
-              <option value="Mobile Banking V2">Mobile Banking V2</option>
-              <option value="Core Banking API">Core Banking API</option>
-              <option value="AI Chatbot">AI Chatbot</option>
+              <option value="">Chọn dự án...</option>
+              {projects.map((p, i) => <option key={i} value={p.id}>{p.name}</option>)}
             </select>
           </div>
 

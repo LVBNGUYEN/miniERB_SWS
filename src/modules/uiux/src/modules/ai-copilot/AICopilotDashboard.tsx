@@ -30,7 +30,8 @@ const AICopilotDashboard: React.FC = () => {
       content: 'Chào bạn! Tôi là trợ lý AI chiến lược của tập đoàn. Tôi đã phân tích dữ liệu từ 16 phân hệ ERP sáng nay. Bạn muốn tôi giúp gì?',
       suggestions: [
         'Phân tích rủi ro tài chính của dự án Mobile Banking',
-        'Dự báo tiến độ dự án SkyLine ERP trong tháng tới',
+        'Tạo báo giá dự án mới (Auto-Quotation)',
+        'Phân tích rủi ro hệ thống tức thời',
         'Đề xuất phân bổ nguồn lực tối ưu cho chi nhánh Nhật Bản'
       ]
     }

@@ -5,7 +5,7 @@ import { resolve } from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/uiux/',
   build: {
     outDir: '../../../dist/modules/uiux',
     emptyOutDir: true,
@@ -16,6 +16,7 @@ export default defineConfig({
     },
   },
   server: {
+    open: '/uiux/login',
     proxy: {
       '/iam': 'http://localhost:3000',
       '/projects': 'http://localhost:3000',
