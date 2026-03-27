@@ -336,6 +336,22 @@ export class IamService implements OwnershipValidator {
     });
   }
 
+  async findClients() {
+    return this.userRepository.find({
+      where: { role: 'CLIENT' },
+      select: ['id', 'email', 'fullName'],
+      order: { fullName: 'ASC' }
+    });
+  }
+
+  async findVendors() {
+    return this.userRepository.find({
+      where: { role: 'VENDOR' },
+      select: ['id', 'email', 'fullName'],
+      order: { fullName: 'ASC' }
+    });
+  }
+
   async getSecuritySettings(): Promise<SecuritySetting> {
     let setting = await this.securitySettingRepository.findOne({ where: {} });
     if (!setting) {

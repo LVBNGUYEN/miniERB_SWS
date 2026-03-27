@@ -1,7 +1,9 @@
-import { Column, Entity, ManyToOne, JoinColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { AbstractEntity } from '../../../common/abstract.entity';
 import { Project } from './project.entity';
 import { User } from '../../iam/entities/user.entity';
+import { TaskStatus } from './task-status.enum';
+import { Timesheet } from './timesheet.entity';
 
 @Entity('prj_tasks')
 export class Task extends AbstractEntity {
@@ -22,8 +24,18 @@ export class Task extends AbstractEntity {
   @Column({ length: 255 })
   title: string;
 
-  @Column({ length: 50, default: 'TODO' })
-  status: string;
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({
+    type: 'enum',
+    enum: TaskStatus,
+    default: TaskStatus.TODO,
+  })
+  status: TaskStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  deadline: Date;
 
   @Column({ name: 'estimated_hours', type: 'decimal', precision: 8, scale: 2, nullable: true })
   estimatedHours: number;
@@ -36,4 +48,7 @@ export class Task extends AbstractEntity {
 
   @Column({ name: 'actual_hours', type: 'decimal', precision: 8, scale: 2, default: 0 })
   actualHours: number;
+
+  @OneToMany(() => Timesheet, (timesheet) => timesheet.task)
+  timesheets: Timesheet[];
 }

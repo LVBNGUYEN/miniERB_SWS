@@ -21,6 +21,8 @@ import { Role } from '../../../../iam/entities/role.enum';
 const ProjectDashboard: React.FC = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [pms, setPms] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,8 +35,21 @@ const ProjectDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newProjectData, setNewProjectData] = useState({
     name: '',
-    pmId: '',
-    estimatedHours: 0
+    description: '',
+    clientId: '',
+    estimatedBudget: 0,
+    startDate: '',
+    endDate: ''
+  });
+  
+  const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  const [taskSuccess, setTaskSuccess] = useState(false);
+  const [newTaskData, setNewTaskData] = useState({
+    title: '',
+    description: '',
+    deadline: '',
+    estimatedHours: 0,
+    assigneeId: ''
   });
 
   useEffect(() => {
@@ -59,6 +74,12 @@ const ProjectDashboard: React.FC = () => {
       const pmRes = await api.get('/iam/pm-list');
       setPms(Array.isArray(pmRes) ? pmRes : []);
 
+      const clientRes = await api.get('/iam/client-list');
+      setClients(Array.isArray(clientRes) ? clientRes : []);
+
+      const vendorRes = await api.get('/iam/vendor-list');
+      setVendors(Array.isArray(vendorRes) ? vendorRes : []);
+
     } catch (err) {
       console.error('Fetch data error:', err);
     } finally {
@@ -82,15 +103,12 @@ const ProjectDashboard: React.FC = () => {
   const handleCreateProject = async () => {
     if (!newProjectData.name) return;
     try {
-      await api.post('/projects', {
-        ...newProjectData,
-        status: 'ACTIVE'
-      });
+      await api.post('/projects', newProjectData);
       setIsSuccess(true);
       setTimeout(() => {
         setIsNewProjectModalOpen(false);
         setIsSuccess(false);
-        setNewProjectData({ name: '', pmId: '', estimatedHours: 0 });
+        setNewProjectData({ name: '', description: '', clientId: '', estimatedBudget: 0, startDate: '', endDate: '' });
         fetchInitialData();
       }, 1500);
     } catch (err) {
@@ -102,6 +120,26 @@ const ProjectDashboard: React.FC = () => {
   const handleSelectProject = (proj: any) => {
     setSelectedProject(proj);
     fetchTasks(proj.id);
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskData.title || !selectedProject) return;
+    try {
+      await api.post('/tasks', {
+        ...newTaskData,
+        projectId: selectedProject.id
+      });
+      setTaskSuccess(true);
+      setTimeout(() => {
+        setIsNewTaskModalOpen(false);
+        setTaskSuccess(false);
+        setNewTaskData({ title: '', description: '', deadline: '', estimatedHours: 0, assigneeId: '' });
+        fetchTasks(selectedProject.id);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Create task error:', err);
+      alert(err.response?.data?.message || 'Không thể tạo Task.');
+    }
   };
 
   const filteredProjects = useMemo(() => {
@@ -125,6 +163,91 @@ const ProjectDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-5 duration-700">
+      {/* New Task Modal */}
+      <Modal 
+        isOpen={isNewTaskModalOpen} 
+        onClose={() => setIsNewTaskModalOpen(false)} 
+        title="Gán phân rã công việc (Task)"
+      >
+        <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Tiêu đề Task</label>
+              <input 
+                type="text" 
+                value={newTaskData.title}
+                onChange={(e) => setNewTaskData({...newTaskData, title: e.target.value})}
+                placeholder="VD: Viết API lấy danh sách..."
+                className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none italic font-bold placeholder:italic focus:border-accent-blue transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Mô tả công việc</label>
+              <textarea 
+                value={newTaskData.description}
+                onChange={(e) => setNewTaskData({...newTaskData, description: e.target.value})}
+                placeholder="Chi tiết công việc..."
+                rows={3}
+                className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all"
+              />
+            </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Giờ dự kiến (EST)</label>
+                <input 
+                  type="number" 
+                  value={newTaskData.estimatedHours}
+                  onChange={(e) => setNewTaskData({...newTaskData, estimatedHours: Number(e.target.value)})}
+                  placeholder="24..." 
+                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all" 
+                />
+            </div>
+            <div className="space-y-2">
+               <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Gán Vendor</label>
+               <select 
+                 value={newTaskData.assigneeId}
+                 onChange={(e) => setNewTaskData({...newTaskData, assigneeId: e.target.value})}
+                 className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all"
+               >
+                 <option value="">— Chọn Vendor —</option>
+                 {vendors.length === 0 ? (
+                   <option disabled>Đang tải danh sách Vendor...</option>
+                 ) : (
+                   vendors.map((v: any) => (
+                     <option key={v.id} value={v.id}>{v.fullName} ({v.email})</option>
+                   ))
+                 )}
+               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-2">
+                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Ngày Deadline</label>
+                <input 
+                  type="date" 
+                  value={newTaskData.deadline}
+                  onChange={(e) => setNewTaskData({...newTaskData, deadline: e.target.value})}
+                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all" 
+                />
+            </div>
+          </div>
+
+          <button 
+            onClick={handleCreateTask}
+            disabled={taskSuccess || !newTaskData.title}
+            className={`w-full py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 ${
+              taskSuccess 
+              ? 'bg-status-green text-white' 
+              : 'bg-accent-blue text-white hover:bg-blue-600 shadow-xl active:scale-95 disabled:opacity-50 disabled:active:scale-100'
+            }`}
+          >
+            {taskSuccess ? <><Check className="w-6 h-6 animate-bounce" /> <span>Đã tạo Task thành công!</span></> : 'XÁC NHẬN GÁN TASK'}
+          </button>
+        </div>
+      </Modal>
+
       {/* New Project Modal */}
       <Modal 
         isOpen={isNewProjectModalOpen} 
@@ -162,44 +285,54 @@ const ProjectDashboard: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Thời gian dự kiến (Giờ)</label>
+                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Ngân sách dự kiến (VND)</label>
                 <input 
                   type="number" 
-                  value={newProjectData.estimatedHours}
-                  onChange={(e) => setNewProjectData({...newProjectData, estimatedHours: Number(e.target.value)})}
-                  placeholder="160..." 
+                  value={newProjectData.estimatedBudget}
+                  onChange={(e) => setNewProjectData({...newProjectData, estimatedBudget: Number(e.target.value)})}
+                  placeholder="50000000..." 
                   className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all" 
                 />
             </div>
             <div className="space-y-2">
-               <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Ưu tiên</label>
-               <select className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all">
-                  <option>HIGH</option>
-                  <option>MEDIUM</option>
-                  <option>LOW</option>
-               </select>
-            </div>
-          </div>
-
-          {user?.role !== Role.PM && (
-            <div className="space-y-2">
-               <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Chủ nhiệm dự án (PM)</label>
+               <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Khách hàng (Client)</label>
                <select 
-                 value={newProjectData.pmId}
-                 onChange={(e) => setNewProjectData({...newProjectData, pmId: e.target.value})}
+                 value={newProjectData.clientId}
+                 onChange={(e) => setNewProjectData({...newProjectData, clientId: e.target.value})}
                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold appearance-none cursor-pointer focus:border-accent-blue transition-all"
                >
-                 <option value="">— Chọn PM phụ trách —</option>
-                 {pms.length === 0 ? (
-                   <option disabled>Đang tải danh sách PM...</option>
+                 <option value="">— Chọn Client phụ trách —</option>
+                 {clients.length === 0 ? (
+                   <option disabled>Đang tải danh sách Client...</option>
                  ) : (
-                   pms.map((pm: any) => (
-                     <option key={pm.id} value={pm.id}>{pm.fullName} ({pm.email})</option>
+                   clients.map((client: any) => (
+                     <option key={client.id} value={client.id}>{client.fullName} ({client.email})</option>
                    ))
                  )}
                </select>
             </div>
-          )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Ngày bắt đầu</label>
+                <input 
+                  type="date" 
+                  value={newProjectData.startDate}
+                  onChange={(e) => setNewProjectData({...newProjectData, startDate: e.target.value})}
+                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all" 
+                />
+            </div>
+            <div className="space-y-2">
+                <label className="text-xs font-black text-text-secondary uppercase tracking-[0.2em]">Ngày kết thúc</label>
+                <input 
+                  type="date" 
+                  value={newProjectData.endDate}
+                  onChange={(e) => setNewProjectData({...newProjectData, endDate: e.target.value})}
+                  className="w-full p-4 bg-bg-surface border border-border-primary rounded-2xl text-text-primary outline-none font-bold focus:border-accent-blue transition-all" 
+                />
+            </div>
+          </div>
 
           <button 
             onClick={handleCreateProject}
@@ -326,8 +459,18 @@ const ProjectDashboard: React.FC = () => {
                    {selectedProject ? `Đã chọn: ${selectedProject.name}` : 'Chọn một dự án bên trái'}
                  </p>
               </div>
-              <div className="p-2 bg-bg-surface rounded-lg border border-border-primary">
-                 <TrendingUp className="w-4 h-4 text-accent-blue" />
+              <div className="flex gap-2">
+                 {(user?.role === Role.PM || user?.role === Role.CEO) && selectedProject && (
+                    <button 
+                      onClick={() => setIsNewTaskModalOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-blue/10 hover:bg-accent-blue text-accent-blue hover:text-white rounded-lg transition-all font-black text-[10px] uppercase tracking-widest border border-accent-blue/30"
+                    >
+                      <Plus className="w-3 h-3" /> Task
+                    </button>
+                 )}
+                 <div className="p-2 bg-bg-surface rounded-lg border border-border-primary cursor-pointer hover:border-accent-blue transition-colors">
+                    <TrendingUp className="w-4 h-4 text-accent-blue" />
+                 </div>
               </div>
            </div>
 

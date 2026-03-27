@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '../../components/Modal';
+import TimesheetBoard from '../vendor/TimesheetBoard';
 import { 
   Clock, 
   Calendar as CalendarIcon, 
@@ -23,6 +24,7 @@ const TimesheetDashboard: React.FC = () => {
   const userStr = getCookie('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const isPM = user?.role === Role.PM;
+  const isVendor = user?.role === Role.VENDOR;
   const days = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'CN'];
   const [timesheetData, setTimesheetData] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -88,6 +90,10 @@ const TimesheetDashboard: React.FC = () => {
         <Loader2 className="w-8 h-8 text-accent-blue animate-spin" />
       </div>
     );
+  }
+
+  if (isVendor) {
+    return <TimesheetBoard />;
   }
 
   return (

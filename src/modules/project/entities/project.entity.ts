@@ -5,6 +5,7 @@ import { Contract } from '../../sales/entities/contract.entity';
 import { Branch } from '../../system/entities/branch.entity';
 import { User } from '../../iam/entities/user.entity';
 import { Task } from './task.entity';
+import { ProjectStatus } from './project-status.enum';
 
 @Entity('prj_projects')
 export class Project extends AbstractEntity {
@@ -36,11 +37,30 @@ export class Project extends AbstractEntity {
   @JoinColumn({ name: 'pm_id' })
   pm: User;
 
+  @Column({ name: 'client_id', type: 'uuid', nullable: true })
+  clientId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'client_id' })
+  client: User;
+
   @Column({ length: 255 })
   name: string;
 
-  @Column({ length: 50, default: 'PENDING' })
-  status: string;
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ name: 'estimated_budget', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  estimatedBudget: number;
+
+  @Column({ name: 'start_date', type: 'timestamp', nullable: true })
+  startDate: Date;
+
+  @Column({ name: 'end_date', type: 'timestamp', nullable: true })
+  endDate: Date;
+
+  @Column({ type: 'enum', enum: ProjectStatus, default: ProjectStatus.IN_PROGRESS })
+  status: ProjectStatus;
 
   @Column({ name: 'is_alerted_80', default: false })
   isAlerted80: boolean;

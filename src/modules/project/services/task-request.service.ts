@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TaskRequest, TaskRequestStatus } from '../entities/task-request.entity';
 import { Task } from '../entities/task.entity';
+import { TaskStatus } from '../entities/task-status.enum';
 
 @Injectable()
 export class TaskRequestService {
@@ -93,7 +94,7 @@ export class TaskRequestService {
       projectId: request.projectId,
       title: request.title,
       estimatedHours: request.estimatedHours,
-      status: 'TODO',
+      status: TaskStatus.TODO,
     });
 
     request.status = TaskRequestStatus.DISTRIBUTED;
