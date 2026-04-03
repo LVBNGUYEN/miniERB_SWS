@@ -113,6 +113,14 @@ export class IamController {
   }
 
   @ApiBearerAuth()
+  @Roles(Role.CEO, Role.PM)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Get('dev-list')
+  async listDevs() {
+    return this.iamService.findDevs();
+  }
+
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all users (Admin only)' })
   @Roles(Role.CEO)
   @UseGuards(JwtAuthGuard, RolesGuard)

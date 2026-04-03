@@ -18,26 +18,32 @@ import {
   User,
   Loader2
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getCookie } from '../../utils/cookie';
 import { Role } from '../../../../iam/entities/role.enum';
 import { api } from '../../api';
 
 const AICopilotDashboard: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<any[]>([
     { 
       role: 'ai', 
-      content: 'Chào bạn! Tôi là trợ lý AI chiến lược của tập đoàn. Tôi đã phân tích dữ liệu từ 16 phân hệ ERP sáng nay. Bạn muốn tôi giúp gì?',
+      content: t('ai.welcome'),
       suggestions: [
-        'Phân tích rủi ro tài chính của dự án Mobile Banking',
-        'Tạo báo giá dự án mới (Auto-Quotation)',
-        'Phân tích rủi ro hệ thống tức thời',
-        'Đề xuất phân bổ nguồn lực tối ưu cho chi nhánh Nhật Bản'
+        t('ai.suggestion1'),
+        t('ai.suggestion2'),
+        t('ai.suggestion3'),
+        t('ai.suggestion4')
       ]
     }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Simulation states
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationProgress, setSimulationProgress] = useState(0);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -66,17 +72,38 @@ const AICopilotDashboard: React.FC = () => {
     } catch (error) {
       setMessages([...newMsgs, { 
         role: 'ai', 
-        content: 'Xin lỗi, hệ thống AI đang gặp sự cố kết nối. Vui lòng thử lại sau.' 
+        content: t('ai.error_msg') 
       }]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  const handleRunSimulation = () => {
+    setIsSimulating(true);
+    setSimulationProgress(0);
+    const interval = setInterval(() => {
+      setSimulationProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setIsSimulating(false);
+            setMessages(prevMsgs => [...prevMsgs, {
+              role: 'ai',
+              content: t('ai.sim_success')
+            }]);
+          }, 500);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 150);
+  };
+
   const aiInsights = [
-    { title: 'Tối ưu hóa Nguồn lực', desc: 'Có thể điều chuyển 2 lập trình viên từ dự án AI Chatbot sang SkyLine ERP để đẩy nhanh tiến độ thêm 12.4%.', type: 'Success' },
-    { title: 'Cảnh báo Rủi ro Tài chính', desc: 'Dự án Mobile Banking có dấu hiệu trượt ngân sách do số giờ làm việc thực tế vượt mức dự kiến 15% trong tuần qua.', type: 'Warning' },
-    { title: 'Dự báo Doanh thu Q2', desc: 'Dựa trên tốc độ hiện tại, doanh thu quý 2 dự kiến đạt 35 tỷ VND, vượt mục tiêu đề ra 8%.', type: 'Info' },
+    { title: t('ai.insight_res_title'), desc: t('ai.insight_res_desc'), type: 'Success' },
+    { title: t('ai.insight_fin_title'), desc: t('ai.insight_fin_desc'), type: 'Warning' },
+    { title: t('ai.insight_rev_title'), desc: t('ai.insight_rev_desc'), type: 'Info' },
   ];
 
   return (
@@ -93,15 +120,15 @@ const AICopilotDashboard: React.FC = () => {
                  <Sparkles className="w-6 h-6 text-white" />
               </div>
               <div>
-                 <h3 className="text-lg font-black text-text-primary italic">AMIT AI Copilot</h3>
+                 <h3 className="text-lg font-black text-text-primary italic">{t('ai.copilot_title')}</h3>
                  <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest flex items-center gap-1.5 underline decoration-accent-blue/30 underline-offset-4">
                     <span className="w-1.5 h-1.5 rounded-full bg-status-green animate-pulse"></span>
-                    Hệ thống đang trực tuyến
+                    {t('ai.online_status')}
                  </p>
               </div>
            </div>
            <button className="flex items-center gap-2 px-4 py-2 bg-bg-surface border border-border-primary rounded-xl text-[10px] font-black uppercase tracking-widest text-text-secondary hover:text-text-primary transition-all shadow-sm">
-              <HistoryIcon className="w-4 h-4" /> Lịch sử yêu cầu
+              <HistoryIcon className="w-4 h-4" /> {t('ai.req_history')}
            </button>
         </div>
 
@@ -140,16 +167,16 @@ const AICopilotDashboard: React.FC = () => {
                       <ul className="space-y-3 font-bold italic">
                         <li className="flex gap-3">
                            <div className="w-1 h-auto bg-accent-blue rounded-full shrink-0 animate-pulse"></div>
-                           <p className="text-xs text-text-secondary"><span className="text-text-primary font-black uppercase tracking-tighter decoration-accent-blue/30 underline decoration-2">Dòng tiền:</span> Khả dụng 3.2 tỷ VND, tăng 8.1% so với tuần trước nhờ hóa đơn dự án FPT được thanh toán sớm.</p>
+                           <p className="text-xs text-text-secondary"><span className="text-text-primary font-black uppercase tracking-tighter decoration-accent-blue/30 underline decoration-2">{t('ai.finance_cash_flow')}:</span> {t('ai.finance_cash_flow_desc')}</p>
                         </li>
                         <li className="flex gap-3">
                            <div className="w-1 h-auto bg-status-yellow rounded-full shrink-0 animate-pulse"></div>
-                           <p className="text-xs text-text-secondary"><span className="text-text-primary font-black uppercase tracking-tighter decoration-status-yellow/30 underline decoration-2">Chi phí:</span> Vượt 2.4% định mức tại mảng R&D. Cần tối ưu hóa chi tiêu hạ tầng Cloud tầng 5.</p>
+                           <p className="text-xs text-text-secondary"><span className="text-text-primary font-black uppercase tracking-tighter decoration-status-yellow/30 underline decoration-2">{t('ai.finance_cost')}:</span> {t('ai.finance_cost_desc')}</p>
                         </li>
                       </ul>
                    </div>
                  )}
-                 {m.role === 'ai' && <p className="text-[10px] font-black uppercase text-text-secondary pt-2 opacity-50 italic tracking-widest border-t border-border-primary mt-2">Dữ liệu cập nhật {new Date().toLocaleTimeString()} Hôm nay</p>}
+                 {m.role === 'ai' && <p className="text-[10px] font-black uppercase text-text-secondary pt-2 opacity-50 italic tracking-widest border-t border-border-primary mt-2">{t('ai.data_updated', { time: new Date().toLocaleTimeString(i18n.language === 'en' ? 'en-US' : 'vi-VN') })}</p>}
                </div>
             </div>
            ))}
@@ -161,7 +188,7 @@ const AICopilotDashboard: React.FC = () => {
                 </div>
                 <div className="bg-bg-surface p-6 rounded-2xl border border-border-primary text-xs italic font-bold text-text-secondary animate-pulse flex items-center gap-2">
                    <Loader2 className="w-4 h-4 animate-spin" />
-                   AMIT AI đang phân tích dữ liệu ERP tức thời...
+                   {t('ai.analyzing_msg')}
                 </div>
              </div>
            )}
@@ -180,7 +207,7 @@ const AICopilotDashboard: React.FC = () => {
                  type="text" 
                  value={query}
                  onChange={(e) => setQuery(e.target.value)}
-                 placeholder="Hỏi AI về bất kỳ dữ liệu chiến lược nào..." 
+                 placeholder={t('ai.input_placeholder')} 
                  className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-secondary font-black italic"
               />
               <button 
@@ -189,10 +216,10 @@ const AICopilotDashboard: React.FC = () => {
                 className="h-10 px-6 bg-accent-blue hover:bg-blue-600 text-white rounded-xl font-black text-xs transition-all flex items-center gap-2 shadow-lg shadow-blue-500/30 uppercase tracking-widest disabled:opacity-50"
               >
                  <Send className="w-4 h-4" />
-                 <span>GỬI YÊU CẦU</span>
+                 <span>{t('ai.send_btn')}</span>
               </button>
            </form>
-           <p className="text-[9px] text-text-secondary font-black text-center mt-4 uppercase tracking-[0.2em] opacity-50 italic">AI có thể đưa ra sai sót. Cổng thông tin hỗ trợ quyết định ERP V2.0.</p>
+           <p className="text-[9px] text-text-secondary font-black text-center mt-4 uppercase tracking-[0.2em] opacity-50 italic">{t('ai.disclaimer')}</p>
         </div>
       </div>
 
@@ -202,13 +229,13 @@ const AICopilotDashboard: React.FC = () => {
          <div className="bg-bg-card rounded-3xl border border-border-primary p-6 space-y-6 shadow-xl">
             <h3 className="text-[10px] font-black text-text-primary uppercase tracking-widest flex items-center gap-2 italic">
                <Cpu className="w-4 h-4 text-accent-blue" />
-               Trạng thái Xử lý AI
+               {t('ai.processing_status')}
             </h3>
             <div className="space-y-6">
                <div className="space-y-2">
                   <div className="flex justify-between text-[11px] font-black uppercase italic">
                      <span className="text-text-secondary tracking-tighter">Neural Processing Unit</span>
-                     <span className="text-status-green">94% Stable</span>
+                     <span className="text-status-green">{t('ai.processing_stable')}</span>
                   </div>
                   <div className="h-1.5 w-full bg-bg-surface rounded-full overflow-hidden border border-border-primary shadow-inner">
                      <div className="h-full bg-accent-blue animate-pulse" style={{ width: '92%' }}></div>
@@ -217,7 +244,7 @@ const AICopilotDashboard: React.FC = () => {
                <div className="space-y-2">
                   <div className="flex justify-between text-[11px] font-black uppercase italic">
                      <span className="text-text-secondary tracking-tighter">Data Integration Level</span>
-                     <span className="text-accent-blue">Active Sync</span>
+                     <span className="text-accent-blue">{t('ai.processing_sync')}</span>
                   </div>
                   <div className="h-1.5 w-full bg-bg-surface rounded-full overflow-hidden border border-border-primary shadow-inner">
                      <div className="h-full bg-accent-blue" style={{ width: '100%' }}></div>
@@ -230,7 +257,7 @@ const AICopilotDashboard: React.FC = () => {
          <div className="bg-bg-card rounded-3xl border border-border-primary p-6 space-y-6 flex-1 shadow-xl">
             <h3 className="text-sm font-black text-text-primary flex items-center gap-2 mb-4 italic uppercase tracking-tight underline decoration-accent-blue/30 underline-offset-4">
                <Brain className="w-5 h-5 text-accent-blue" />
-               Góc nhìn Chiến lược AI
+               {t('ai.strategy_title')}
             </h3>
             <div className="space-y-4">
               {aiInsights.map((insight, i) => (
@@ -257,11 +284,26 @@ const AICopilotDashboard: React.FC = () => {
 
          <div className="bg-gradient-to-br from-indigo-600 to-accent-blue rounded-3xl p-6 text-white text-center space-y-4 shadow-2xl relative overflow-hidden group border border-white/5">
             <div className="absolute inset-0 bg-white/5 -rotate-12 translate-y-1/2 scale-150 blur-2xl group-hover:bg-white/10 transition-all duration-1000"></div>
-            <Rocket className="w-10 h-10 text-white mx-auto animate-bounce shadow-xl" />
-            <h4 className="text-lg font-black tracking-tight relative z-10 italic uppercase">Kích hoạt AI Forecast</h4>
-            <p className="text-blue-100/70 text-[10px] font-black leading-relaxed relative z-10 uppercase tracking-widest px-2">Mô phỏng 1,000 kịch bản vận hành để lựa chọn con đường tăng trưởng tối ưu nhất.</p>
-            <button className="w-full py-4 bg-white text-indigo-700 rounded-xl font-black text-xs hover:bg-slate-100 transition-all relative z-10 shadow-xl shadow-blue-900/40 uppercase tracking-widest active:scale-95">
-              CHẠY MÔ PHỎNG NGAY
+            <Rocket className={`w-10 h-10 text-white mx-auto shadow-xl ${isSimulating ? 'animate-bounce' : ''}`} />
+            <h4 className="text-lg font-black tracking-tight relative z-10 italic uppercase">
+              {isSimulating ? t('ai.sim_forecast_title', { progress: simulationProgress }) : t('ai.forecast_title')}
+            </h4>
+            <p className="text-blue-100/70 text-[10px] font-black leading-relaxed relative z-10 uppercase tracking-widest px-2">
+              {isSimulating ? t('ai.sim_calc_desc') : t('ai.forecast_desc')}
+            </p>
+
+            {isSimulating && (
+              <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden absolute bottom-0 left-0">
+                 <div className="h-full bg-white transition-all duration-300 shadow-lg" style={{ width: `${simulationProgress}%` }}></div>
+              </div>
+            )}
+
+            <button 
+              onClick={handleRunSimulation}
+              disabled={isSimulating}
+              className="w-full py-4 bg-white text-indigo-700 rounded-xl font-black text-xs hover:bg-slate-100 transition-all relative z-10 shadow-xl shadow-blue-900/40 uppercase tracking-widest active:scale-95 disabled:opacity-50"
+            >
+              {isSimulating ? t('ai.running_btn') : t('ai.run_sim_btn')}
             </button>
          </div>
       </div>

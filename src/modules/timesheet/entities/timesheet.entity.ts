@@ -9,7 +9,7 @@ export class Timesheet extends AbstractEntity {
   @Column({ name: 'task_id', type: 'uuid' })
   taskId: string;
 
-  @ManyToOne(() => Task)
+  @ManyToOne(() => Task, (task) => task.timesheets)
   @JoinColumn({ name: 'task_id' })
   task: Task;
 
@@ -35,8 +35,14 @@ export class Timesheet extends AbstractEntity {
   @Column({ name: 'snapshot_billable_price', type: 'decimal', precision: 15, scale: 2 })
   snapshotBillablePrice: number;
 
-  @Column({ name: 'approval_status', length: 50 })
+  @Column({ name: 'approval_status', length: 50, default: 'PENDING' })
   approvalStatus: string;
+
+  @Column({ name: 'start_time', type: 'timestamp', nullable: true })
+  startTime: Date;
+
+  @Column({ name: 'end_time', type: 'timestamp', nullable: true })
+  endTime: Date;
 
   @Column({ name: 'approved_by', type: 'uuid', nullable: true })
   approvedBy: string;

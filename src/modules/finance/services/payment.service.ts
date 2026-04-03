@@ -60,10 +60,57 @@ export class PaymentService {
   }
 
   async payVendorDebt(debtId: string): Promise<VendorDebt> {
-    const debt = await this.dataSource.getRepository(VendorDebt).findOne({ where: { id: debtId } });
-    if (!debt) throw new NotFoundException('Debt not found');
-    
-    await this.dataSource.getRepository(VendorDebt).update(debtId, { status: 'PAID' });
-    return this.dataSource.getRepository(VendorDebt).findOne({ where: { id: debtId } });
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const repository = queryRunner.manager.getRepository(VendorDebt);
+      const debt = await repository.findOne({ where: { id: debtId } });
+      if (!debt) throw new NotFoundException('Debt not found');
+      
+      await repository.update(debtId, { status: 'PAID' });
+      const updated = await repository.findOne({ where: { id: debtId } });
+
+      await queryRunner.commitTransaction();
+      return updated!;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async getVendorDebtSummary() {
+    return this.dataSource.getRepository(VendorDebt)
+      .createQueryBuilder('debt')
+      .innerJoin('iam_users', 'vendor', 'vendor.id = debt.vendorId AND vendor.deletedAt IS NULL')
+      .select('vendor.fullName', 'vendorName')
+      .addSelect('vendor.id', 'vendorId')
+      .addSelect('COALESCE(SUM(debt.amount), 0)', 'totalOwed')
+      .addSelect('COUNT(debt.id)', 'debtRecordCount')
+      .where('debt.status = :status', { status: 'PENDING_PAYMENT' })
+      .andWhere('debt.deletedAt IS NULL')
+      .groupBy('vendor.id')
+      .addGroupBy('vendor.fullName')
+      .getRawMany();
+  }
+
+  async getVendorEarnings(vendorId: string) {
+    const data: any = await this.dataSource.getRepository(VendorDebt)
+      .createQueryBuilder('debt')
+      .select('SUM(CASE WHEN debt.status = \'PAID\' THEN debt.amount ELSE 0 END)', 'paid')
+      .addSelect('SUM(CASE WHEN debt.status = \'PENDING_PAYMENT\' THEN debt.amount ELSE 0 END)', 'pending')
+      .addSelect('COUNT(debt.id)', 'totalTasks')
+      .where('debt.vendorId = :vendorId', { vendorId })
+      .andWhere('debt.deletedAt IS NULL')
+      .getRawOne();
+
+    return {
+      totalPaid: Number(data.paid || 0),
+      pendingPayment: Number(data.pending || 0),
+      totalTasks: Number(data.totalTasks || 0),
+    };
   }
 }

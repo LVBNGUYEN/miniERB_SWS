@@ -15,19 +15,33 @@ export class TimesheetService {
     private readonly alertService: SysAlertService,
   ) {}
 
-  async logHours(taskId: string, hours: number, vendorId: string, snapshotPrice: number) {
-    const timesheet = this.timesheetRepository.create({
-      taskId,
-      userId: vendorId,
-      loggedHours: hours,
-      logDate: new Date(),
-      snapshotPrice,
-      snapshotBillablePrice: snapshotPrice * 1.5, // Default billable margin
-      approvalStatus: 'PENDING',
-      workType: 'DEVELOPMENT'
-    });
+  async logHours(taskId: string, hours: number, vendorId: string, snapshotPrice: number, notes?: string) {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    return this.timesheetRepository.save(timesheet);
+    try {
+      const timesheet = queryRunner.manager.create(Timesheet, {
+        taskId,
+        userId: vendorId,
+        loggedHours: Number(hours),
+        logDate: new Date(),
+        snapshotPrice: Number(snapshotPrice),
+        snapshotBillablePrice: Number(snapshotPrice) * 1.5, // Default billable margin
+        approvalStatus: 'PENDING',
+        workType: 'DEVELOPMENT',
+        rejectReason: notes // Reusing rejectReason as general notes field prior to rejection
+      });
+
+      const saved = await queryRunner.manager.save(Timesheet, timesheet);
+      await queryRunner.commitTransaction();
+      return saved;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async approveTimesheet(id: string, approverId: string): Promise<Timesheet> {
@@ -46,12 +60,12 @@ export class TimesheetService {
         throw new NotFoundException('Timesheet not found');
       }
 
-      if (timesheet.approvalStatus === 'Approved') {
+      if (timesheet.approvalStatus === 'APPROVED') {
         throw new BadRequestException('Timesheet is already approved');
       }
 
       // 1. Update Timesheet
-      timesheet.approvalStatus = 'Approved';
+      timesheet.approvalStatus = 'APPROVED';
       timesheet.approvedBy = approverId;
       await queryRunner.manager.save(timesheet);
 
@@ -92,11 +106,88 @@ export class TimesheetService {
     }
   }
 
+  async rejectTimesheet(id: string, reason: string, approverId: string): Promise<Timesheet> {
+    const timesheet = await this.timesheetRepository.findOne({ where: { id } });
+    if (!timesheet) throw new NotFoundException('Timesheet not found');
+
+    timesheet.approvalStatus = 'REJECTED';
+    timesheet.rejectReason = reason;
+    timesheet.approvedBy = approverId;
+
+    return this.timesheetRepository.save(timesheet);
+  }
+
   async findPending(): Promise<Timesheet[]> {
     return this.timesheetRepository.find({
       where: { approvalStatus: 'PENDING' },
-      relations: ['task'],
+      relations: ['task', 'task.project', 'user'],
       order: { logDate: 'DESC' }
+    });
+  }
+
+  async clockIn(taskId: string, userId: string): Promise<Timesheet> {
+    const active = await this.timesheetRepository.findOne({
+      where: { userId, approvalStatus: 'IN_PROGRESS' }
+    });
+    if (active) throw new BadRequestException('You already have an active work session. Please clock out first.');
+
+    const timesheet = this.timesheetRepository.create({
+      taskId,
+      userId,
+      startTime: new Date(),
+      approvalStatus: 'IN_PROGRESS',
+      workType: 'DEVELOPMENT',
+      logDate: new Date(),
+      loggedHours: 0,
+      snapshotPrice: 0, 
+      snapshotBillablePrice: 0
+    });
+
+    const saved = await this.timesheetRepository.save(timesheet);
+    
+    // Return with relations so UI shows task title immediately
+    return this.timesheetRepository.findOne({
+      where: { id: saved.id },
+      relations: ['task']
+    }) as Promise<Timesheet>;
+  }
+
+  async clockOut(userId: string, notes?: string): Promise<Timesheet> {
+    const active = await this.timesheetRepository.findOne({
+      where: { userId, approvalStatus: 'IN_PROGRESS' },
+      relations: ['task']
+    });
+
+    if (!active) throw new NotFoundException('No active work session found.');
+
+    const now = new Date();
+    const start = new Date(active.startTime);
+    const diffMs = now.getTime() - start.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    /* 
+    if (diffHours < 0.5) {
+      throw new BadRequestException('Work session must be at least 30 minutes. Current duration: ' + Math.round(diffHours * 60) + ' minutes.');
+    }
+    */
+
+    active.endTime = now;
+    active.loggedHours = Number(diffHours.toFixed(2));
+    active.approvalStatus = 'PENDING';
+    active.rejectReason = notes; // Reusing field for session notes
+
+    // Finalize prices if possible (Assuming task or service has logic for this)
+    // For now, keep as previous defaults or logic
+    active.snapshotPrice = active.snapshotPrice || 100; // Placeholder
+    active.snapshotBillablePrice = active.snapshotPrice * 1.5;
+
+    return this.timesheetRepository.save(active);
+  }
+
+  async findActive(userId: string): Promise<Timesheet | null> {
+    return this.timesheetRepository.findOne({
+      where: { userId, approvalStatus: 'IN_PROGRESS' },
+      relations: ['task']
     });
   }
 
@@ -104,7 +195,30 @@ export class TimesheetService {
     return this.timesheetRepository.find({
       where: { userId },
       relations: ['task'],
-      order: { logDate: 'DESC' }
+      order: { createdAt: 'DESC' }
     });
+  }
+
+  /**
+   * Story 14.2: Auto-approve all pending timesheets when a Task is marked DONE (via PKI)
+   */
+  async approveAllForTask(taskId: string, approverId: string | null = null) {
+    const pendings = await this.timesheetRepository.find({
+      where: { taskId, approvalStatus: 'PENDING' }
+    });
+
+    for (const t of pendings) {
+      await this.approveTimesheet(t.id, approverId as any);
+    }
+  }
+
+  async cancelSession(userId: string): Promise<void> {
+    const active = await this.timesheetRepository.findOne({
+      where: { userId, approvalStatus: 'IN_PROGRESS' }
+    });
+    if (!active) throw new NotFoundException('No active work session found.');
+    
+    // Instead of archiving, we delete as per user request "không lưu"
+    await this.timesheetRepository.softDelete(active.id);
   }
 }

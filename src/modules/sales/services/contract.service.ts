@@ -8,6 +8,8 @@ import { ContractMilestone } from '../entities/contract-milestone.entity';
 import { PkiService } from '../../pki/services/pki.service';
 import { ProjectService } from '../../project/services/project.service';
 import { User } from '../../iam/entities/user.entity';
+import { Inject, forwardRef } from '@nestjs/common';
+
 @Injectable()
 export class ContractService {
   constructor(
@@ -17,6 +19,7 @@ export class ContractService {
     private readonly quotationRepository: Repository<Quotation>,
     @InjectRepository(ContractMilestone)
     private readonly milestoneRepository: Repository<ContractMilestone>,
+    @Inject(forwardRef(() => PkiService))
     private readonly pkiService: PkiService,
     private readonly projectService: ProjectService,
     private readonly dataSource: DataSource,
@@ -129,7 +132,14 @@ export class ContractService {
     return this.milestoneRepository.save(milestone);
   }
 
-  async findAllContracts(): Promise<Contract[]> {
+  async findAllContracts(user?: any): Promise<Contract[]> {
+    if (user?.role === 'CLIENT') {
+      return this.contractRepository.find({
+        where: { quotation: { clientId: user.id } },
+        relations: ['quotation', 'quotation.client'],
+        order: { createdAt: 'DESC' },
+      });
+    }
     return this.contractRepository.find({
       relations: ['quotation', 'quotation.client'],
       order: { createdAt: 'DESC' },

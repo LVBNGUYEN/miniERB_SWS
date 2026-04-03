@@ -15,8 +15,9 @@ import { SysAuditModule } from '../sys-audit/sys-audit.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuthCredential, Branch]),
+    TypeOrmModule.forFeature([User, AuthCredential, SecuritySetting, Branch]),
     PassportModule,
+    SysAuditModule,
     JwtModule.register({
       // In a real configuration, use ConfigModule to pull secret from .env
       secret: process.env.JWT_SECRET || 'super-secret-key',

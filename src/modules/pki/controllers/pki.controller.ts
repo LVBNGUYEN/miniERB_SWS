@@ -6,18 +6,32 @@ import { JwtAuthGuard } from '../../iam/guards/jwt-auth.guard';
 import { Role } from '../../iam/entities/role.enum';
 import { Roles } from '../../iam/decorators/roles.decorator';
 import { RolesGuard } from '../../iam/guards/roles.guard';
+import { CurrentUser } from '../../iam/decorators/current-user.decorator';
+import { E2ETestingService } from '../../system/e2e-testing.service';
 
 @ApiTags('PKI') // Digital Signature Gateway
 @Controller('pki')
 export class PkiController {
-  constructor(private readonly pkiService: PkiService) {}
+  constructor(
+    private readonly pkiService: PkiService,
+    private readonly e2eService: E2ETestingService
+  ) {}
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Chạy kịch bản kiểm thử E2E (Epic 15)' })
+  @Roles(Role.CEO)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post('e2e-test')
+  async runE2E(@CurrentUser() user: any) {
+     return this.e2eService.runFullLifecycleTest(user.id, user.id, user.id, user.id);
+  }
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách các tài liệu PKI chờ ký hoặc đã ký' })
   @UseGuards(JwtAuthGuard)
   @Get('documents')
-  async getDocuments() {
-    return this.pkiService.getDocuments();
+  async getDocuments(@CurrentUser() user: any) {
+    return this.pkiService.getDocuments(user);
   }
 
   @ApiBearerAuth()

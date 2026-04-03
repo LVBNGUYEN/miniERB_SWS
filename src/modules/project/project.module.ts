@@ -3,26 +3,26 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Project } from './entities/project.entity';
 import { Task } from './entities/task.entity';
 import { TaskRequest } from './entities/task-request.entity';
-import { Timesheet } from './entities/timesheet.entity';
+import { Timesheet } from '../timesheet/entities/timesheet.entity';
 import { ProjectService } from './services/project.service';
 import { TaskService } from './services/task.service';
 import { TaskRequestService } from './services/task-request.service';
-import { TimesheetService } from './services/timesheet.service';
 import { ProjectController } from './controllers/project.controller';
 import { TaskController } from './controllers/task.controller';
 import { TaskRequestController } from './controllers/task-request.controller';
-import { TimesheetController } from './controllers/timesheet.controller';
 import { SysAuditModule } from '../sys-audit/sys-audit.module';
 import { IamModule } from '../iam/iam.module';
+import { TimesheetModule } from '../timesheet/timesheet.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Project, Task, TaskRequest, Timesheet]),
-    SysAuditModule, // Needed for AuditInterceptor
-    IamModule
+    SysAuditModule, 
+    IamModule,
+    TimesheetModule 
   ],
-  controllers: [ProjectController, TaskController, TaskRequestController, TimesheetController],
-  providers: [ProjectService, TaskService, TaskRequestService, TimesheetService],
-  exports: [ProjectService, TaskService, TaskRequestService, TimesheetService],
+  controllers: [ProjectController, TaskController, TaskRequestController],
+  providers: [ProjectService, TaskService, TaskRequestService],
+  exports: [ProjectService, TaskService, TaskRequestService],
 })
 export class ProjectModule {}

@@ -14,9 +14,11 @@ import { CustomerSupportModule } from './modules/customer-support/customer-suppo
 import { AiEngineModule } from './modules/ai-engine/ai-engine.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',

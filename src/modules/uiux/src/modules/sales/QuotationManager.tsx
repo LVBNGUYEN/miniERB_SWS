@@ -10,11 +10,16 @@ import {
   Filter, 
   Search 
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getCookie } from '../../utils/cookie';
 import { Role } from '../../../../iam/entities/role.enum';
 import Modal from '../../components/Modal';
+import { useAlert } from '../../hooks/useAlert';
+import AlertModal from '../../components/AlertModal';
 
 const QuotationManager: React.FC = () => {
+  const { t } = useTranslation();
+  const { alertConfig, showAlert, closeAlert } = useAlert();
   const userStr = getCookie('user');
   const user = userStr ? JSON.parse(userStr) : null;
   const isStaff = user?.role === Role.CEO || user?.role === Role.PM || user?.role === Role.SALE;
@@ -23,11 +28,14 @@ const QuotationManager: React.FC = () => {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formState, setFormState] = useState({ title: '', amount: '', clientId: '' });
+
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
 
   useEffect(() => {
     fetchQuotations();
@@ -45,17 +53,58 @@ const QuotationManager: React.FC = () => {
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'APPROVED': return t('quotation_manager.status_approved');
+      case 'PENDING': return t('quotation_manager.status_pending');
+      case 'DRAFT': return t('quotation_manager.status_draft');
+      case 'REJECTED': return t('quotation_manager.status_rejected');
+      default: return status;
+    }
+  };
+
+  const filteredAndSortedQuotations = quotations
+    .filter(q => {
+      const matchesSearch = q.title?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = filterStatus === 'ALL' || q.status === filterStatus;
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a, b) => {
+      const priority: Record<string, number> = {
+        'PENDING': 0,
+        'APPROVED': 1,
+        'REJECTED': 1,
+        'DRAFT': 2
+      };
+      const aP = priority[a.status] ?? 3;
+      const bP = priority[b.status] ?? 3;
+      return aP - bP;
+    });
+
   const handleUpdateStatus = async (id: string, newStatus: string) => {
-    if (newStatus === 'APPROVED' && !window.confirm('Sau khi APPROVED, dữ liệu Báo giá sẽ bị khóa vĩnh viễn (Immutability). Bạn có chắc chắn?')) {
-      return;
+    if (newStatus === 'APPROVED') {
+       showAlert(t('common.confirm'), t('quotation_manager.alert_approve_confirm'), 'confirm', async () => {
+          try {
+            setIsUpdating(id);
+            await api.patch(`/sales/quotations/${id}/status`, { status: newStatus });
+            await fetchQuotations();
+            showAlert(t('common.success'), t('quotation_manager.alert_success_update'), 'success');
+          } catch (err: any) {
+            showAlert(t('common.error'), err.response?.data?.message || t('quotation_manager.alert_error_update'), 'error');
+          } finally {
+            setIsUpdating(null);
+          }
+       });
+       return;
     }
     
     try {
       setIsUpdating(id);
       await api.patch(`/sales/quotations/${id}/status`, { status: newStatus });
       await fetchQuotations();
+      showAlert(t('common.success'), t('quotation_manager.alert_success_update'), 'success');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Lỗi khi cập nhật trạng thái Báo giá.');
+      showAlert(t('common.error'), err.response?.data?.message || t('quotation_manager.alert_error_update'), 'error');
     } finally {
       setIsUpdating(null);
     }
@@ -74,11 +123,11 @@ const QuotationManager: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!formState.title || !formState.amount || isNaN(Number(formState.amount))) {
-      alert('Vui lòng nhập Tên và Số tiền hợp lệ.');
+      showAlert(t('common.error'), t('quotation_manager.alert_invalid_input'), 'error');
       return;
     }
     if (!editingId && !formState.clientId) {
-      alert('Vui lòng nhập Mã Khách Hàng (Client ID) để tạo báo giá mới.');
+      showAlert(t('common.error'), t('quotation_manager.alert_missing_client'), 'error');
       return;
     }
     try {
@@ -99,8 +148,9 @@ const QuotationManager: React.FC = () => {
       }
       setIsModalOpen(false);
       await fetchQuotations();
+      showAlert(t('common.success'), t('quotation_manager.alert_success_save'), 'success');
     } catch (err: any) {
-      alert('Lỗi: ' + (err.response?.data?.message || err.message));
+      showAlert(t('common.error'), t('quotation_manager.alert_error_prefix') + (err.response?.data?.message || err.message), 'error');
     } finally {
       setIsUpdating(null);
     }
@@ -114,32 +164,51 @@ const QuotationManager: React.FC = () => {
     );
   }
 
+  const FilterBtn = ({ status, label }: { status: typeof filterStatus, label: string }) => (
+    <button 
+      onClick={() => setFilterStatus(status)}
+      className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+        filterStatus === status 
+          ? 'bg-accent-blue text-white shadow-lg shadow-accent-blue/20' 
+          : 'bg-bg-surface text-text-secondary opacity-60 hover:opacity-100 border border-border-primary'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="space-y-8 animate-in slide-in-from-top-10 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight italic underline decoration-accent-blue/20 underline-offset-8">
-            Quản lý Báo giá (Quotations)
+            {t('quotation_manager.page_title')}
           </h2>
           <p className="text-text-secondary text-sm font-medium mt-3 italic">
-            Soạn thảo, phê duyệt ngân sách và khóa Scope (Nguyên tắc Immutability).
+            {t('quotation_manager.page_desc')}
           </p>
         </div>
       </div>
 
       <div className="bg-bg-card rounded-3xl border border-border-primary p-8 shadow-2xl relative overflow-hidden">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-lg font-black text-text-primary uppercase flex items-center gap-3 italic">
-            <FileText className="w-5 h-5 text-accent-blue" />
-            Danh sách Báo giá
-          </h3>
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-6 mb-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <FilterBtn status="ALL" label={t('quotation_manager.filter_all')} />
+            <FilterBtn status="DRAFT" label={t('quotation_manager.status_draft')} />
+            <FilterBtn status="PENDING" label={t('quotation_manager.status_pending')} />
+            <FilterBtn status="APPROVED" label={t('quotation_manager.status_approved')} />
+            <FilterBtn status="REJECTED" label={t('quotation_manager.status_rejected')} />
+          </div>
+          
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex bg-bg-surface px-4 py-2 rounded-xl items-center gap-2 border border-border-primary">
+            <div className="bg-bg-surface px-4 py-2 rounded-xl flex items-center gap-2 border border-border-primary max-w-xs">
               <Search className="w-4 h-4 text-text-secondary" />
               <input 
                 type="text" 
-                placeholder="Tìm kiếm..." 
-                className="bg-transparent text-[11px] font-bold outline-none text-text-primary italic"
+                placeholder={t('quotation_manager.search_placeholder')} 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-transparent text-[11px] font-bold outline-none text-text-primary italic w-full"
               />
             </div>
             {isStaff && (
@@ -147,17 +216,17 @@ const QuotationManager: React.FC = () => {
                 onClick={() => handleOpenModal()}
                 className="px-4 py-2 bg-accent-blue hover:bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-colors shadow-lg shadow-accent-blue/20"
               >
-                <Plus className="w-4 h-4" /> Tạo Báo Giá
+                <Plus className="w-4 h-4" /> {t('quotation_manager.create_btn')}
               </button>
             )}
           </div>
         </div>
 
         <div className="space-y-4">
-          {quotations.length === 0 ? (
-            <div className="py-12 text-center text-xs font-black text-text-secondary uppercase italic opacity-40">Chưa có dữ liệu báo giá</div>
+          {filteredAndSortedQuotations.length === 0 ? (
+            <div className="py-12 text-center text-xs font-black text-text-secondary uppercase italic opacity-40">{t('quotation_manager.no_data')}</div>
           ) : (
-            quotations.map((q) => (
+            filteredAndSortedQuotations.map((q) => (
               <div key={q.id} className="group flex flex-col md:flex-row justify-between md:items-center p-6 bg-bg-surface/50 border border-border-primary rounded-2xl hover:bg-bg-card transition-all shadow-sm">
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-3">
@@ -168,7 +237,7 @@ const QuotationManager: React.FC = () => {
                       q.status === 'PENDING' ? 'bg-accent-blue/20 text-accent-blue border border-accent-blue/30' :
                       'bg-status-yellow/20 text-status-yellow border border-status-yellow/30'
                     }`}>
-                      {q.status}
+                      {getStatusLabel(q.status)}
                     </span>
                   </div>
                   <p className="text-[11px] font-bold text-text-secondary italic">
@@ -178,9 +247,9 @@ const QuotationManager: React.FC = () => {
                 
                 <div className="flex items-center gap-6 mt-4 md:mt-0">
                   <div className="text-right">
-                    <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest">Tổng tiền</p>
+                    <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest">{t('quotation_manager.total_amount')}</p>
                     <p className="text-lg font-black text-text-primary italic">
-                      ${Number(q.totalAmount).toLocaleString()}
+                      {Number(q.totalAmount).toLocaleString()} VNĐ
                     </p>
                   </div>
                   
@@ -191,14 +260,14 @@ const QuotationManager: React.FC = () => {
                         disabled={isUpdating === q.id}
                         className={`px-4 py-2 ${isUpdating === q.id ? 'opacity-50' : 'hover:bg-status-green hover:text-white'} text-[10px] font-black uppercase tracking-widest text-status-green border border-status-green/50 rounded-lg transition-all flex items-center justify-center gap-2 bg-status-green/10 shadow-inner`}
                       >
-                        <CheckCircle className="w-3 h-3" /> Phê Duyệt
+                        <CheckCircle className="w-3 h-3" /> {t('quotation_manager.approve')}
                       </button>
                       <button 
                         onClick={() => handleUpdateStatus(q.id, 'REJECTED')}
                         disabled={isUpdating === q.id}
                         className={`px-4 py-2 ${isUpdating === q.id ? 'opacity-50' : 'hover:bg-status-red hover:text-white'} text-[10px] font-black uppercase tracking-widest text-status-red border border-status-red/50 rounded-lg transition-all flex items-center justify-center gap-2 bg-status-red/10 shadow-inner`}
                       >
-                        <XCircle className="w-3 h-3" /> Từ Chối
+                        <XCircle className="w-3 h-3" /> {t('quotation_manager.reject')}
                       </button>
                     </div>
                   )}
@@ -210,14 +279,14 @@ const QuotationManager: React.FC = () => {
                         disabled={isUpdating === q.id}
                         className="px-3 py-2 text-[10px] hover:bg-accent-blue hover:text-white font-black uppercase tracking-widest text-accent-blue border border-accent-blue/50 rounded-lg transition-all flex items-center justify-center gap-2 bg-accent-blue/10"
                       >
-                        <Edit3 className="w-3 h-3" /> Sửa
+                        <Edit3 className="w-3 h-3" /> {t('quotation_manager.edit')}
                       </button>
                       <button 
                         onClick={() => handleUpdateStatus(q.id, 'PENDING')}
                         disabled={isUpdating === q.id}
                         className="px-4 py-2 text-[10px] hover:bg-accent-blue hover:text-white font-black uppercase tracking-widest text-accent-blue border border-accent-blue/50 rounded-lg transition-all flex items-center justify-center gap-2 bg-accent-blue/10"
                       >
-                        Gửi Duyệt
+                        {t('quotation_manager.submit_for_approval')}
                       </button>
                     </div>
                   )}
@@ -228,64 +297,75 @@ const QuotationManager: React.FC = () => {
         </div>
       </div>
       
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-bg-surface w-full max-w-md p-6 rounded-2xl border border-divider shadow-2xl">
-            <h3 className="text-xl font-bold text-text-primary mb-6">{editingId ? 'Chỉnh Sửa Báo Giá' : 'Tạo Báo Giá Mới'}</h3>
-            
-            <div className="space-y-4 mb-6">
-              {!editingId && (
-                <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">Mã Khách Hàng (Client ID)</label>
-                  <input 
-                    type="text" 
-                    value={formState.clientId}
-                    onChange={(e) => setFormState({ ...formState, clientId: e.target.value })}
-                    className="w-full bg-bg-card border border-divider rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-                    placeholder="Nhập System/UUID Khách hàng..."
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">Mô tả / Tên báo giá</label>
-                <input 
-                  type="text" 
-                  value={formState.title}
-                  onChange={(e) => setFormState({ ...formState, title: e.target.value })}
-                  className="w-full bg-bg-card border border-divider rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-                  placeholder="App Mobile Backend..."
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">Giá trị dự kiến (USD)</label>
-                <input 
-                  type="number" 
-                  value={formState.amount}
-                  onChange={(e) => setFormState({ ...formState, amount: e.target.value })}
-                  className="w-full bg-bg-card border border-divider rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
-                  placeholder="5000"
-                />
-              </div>
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={editingId ? t('quotation_manager.modal_title_edit') : t('quotation_manager.modal_title_create')}
+        footer={
+          <div className="flex items-center gap-3 w-full">
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              className="flex-1 px-6 py-2.5 rounded-xl bg-bg-surface text-text-primary font-bold text-sm hover:bg-slate-700/10 transition-all border border-border-primary"
+            >
+              {t('common.close')}
+            </button>
+            <button 
+              onClick={handleSubmit}
+              disabled={isUpdating === (editingId || 'new')}
+              className={`flex-[2] py-2.5 text-sm font-bold rounded-xl text-white shadow-lg transition-all ${isUpdating === (editingId || 'new') ? 'opacity-50 bg-gray-500' : 'bg-accent-blue hover:bg-blue-600'}`}
+            >
+              {t('quotation_manager.save_btn')}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {!editingId && (
+            <div>
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">{t('quotation_manager.client_id_label')}</label>
+              <input 
+                type="text" 
+                value={formState.clientId}
+                onChange={(e) => setFormState({ ...formState, clientId: e.target.value })}
+                className="w-full bg-bg-card border border-border-primary rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
+                placeholder={t('quotation_manager.client_id_placeholder')}
+              />
             </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2.5 text-sm font-semibold rounded-xl text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={handleSubmit}
-                disabled={isUpdating === (editingId || 'new')}
-                className={`px-5 py-2.5 text-sm font-bold rounded-xl text-white shadow-lg transition-all ${isUpdating === (editingId || 'new') ? 'opacity-50 bg-gray-500' : 'bg-accent-blue hover:bg-blue-600'}`}
-              >
-                Lưu Báo Giá
-              </button>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">{t('quotation_manager.description_label')}</label>
+            <input 
+              type="text" 
+              value={formState.title}
+              onChange={(e) => setFormState({ ...formState, title: e.target.value })}
+              className="w-full bg-bg-card border border-border-primary rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors"
+              placeholder={t('quotation_manager.description_placeholder')}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5">{t('quotation_manager.estimated_value_label')}</label>
+            <div className="relative">
+              <input 
+                type="number" 
+                value={formState.amount}
+                onChange={(e) => setFormState({ ...formState, amount: e.target.value })}
+                className="w-full bg-bg-card border border-border-primary rounded-lg px-4 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent-blue transition-colors pr-12"
+                placeholder="5000"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary font-black text-xs">VNĐ</span>
             </div>
           </div>
         </div>
-      )}
+      </Modal>
+
+      <AlertModal 
+        isOpen={alertConfig.isOpen}
+        onClose={closeAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onConfirm={alertConfig.onConfirm}
+      />
     </div>
   );
 };

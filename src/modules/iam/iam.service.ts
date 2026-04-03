@@ -76,11 +76,13 @@ export class IamService implements OwnershipValidator {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // Zero Trust: Never allow users to pick their own role during self sign-up
+    // Default to 'USER' regardless of what was sent in the DTO
     const user = this.userRepository.create({
       email,
       passwordHash,
       fullName,
-      role: role || 'USER',
+      role: 'USER', 
       branchId,
       status: 'ACTIVE',
       actorType: 'HUMAN',
@@ -347,6 +349,14 @@ export class IamService implements OwnershipValidator {
   async findVendors() {
     return this.userRepository.find({
       where: { role: 'VENDOR' },
+      select: ['id', 'email', 'fullName'],
+      order: { fullName: 'ASC' }
+    });
+  }
+
+  async findDevs() {
+    return this.userRepository.find({
+      where: { role: 'DEV' as any }, // casting because some versions might not have DEV enum in DB yet
       select: ['id', 'email', 'fullName'],
       order: { fullName: 'ASC' }
     });

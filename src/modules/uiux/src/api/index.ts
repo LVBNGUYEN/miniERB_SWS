@@ -13,8 +13,20 @@ export const api = {
       },
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
-    return res.json();
+    if (!res.ok) {
+      if (res.status === 401) {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+        window.location.href = '/uiux/login';
+      }
+      const txt = await res.text();
+      let data: any = { message: txt };
+      try { data = JSON.parse(txt); } catch {}
+      const err: any = new Error(Object.keys(data).length ? data.message : `API Error: ${res.status}`);
+      err.response = { data };
+      throw err;
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   },
 
   async patch(url: string, body?: any) {
@@ -27,8 +39,20 @@ export const api = {
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
-    return res.json();
+    if (!res.ok) {
+      if (res.status === 401) {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+        window.location.href = '/uiux/login';
+      }
+      const txt = await res.text();
+      let data: any = { message: txt };
+      try { data = JSON.parse(txt); } catch {}
+      const err: any = new Error(Object.keys(data).length ? data.message : `API Error: ${res.status}`);
+      err.response = { data };
+      throw err;
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   },
 
   async get(url: string) {
@@ -38,8 +62,69 @@ export const api = {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
     });
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
-    return res.json();
+    if (!res.ok) {
+      if (res.status === 401) {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+        window.location.href = '/uiux/login';
+      }
+      const txt = await res.text();
+      let data: any = { message: txt };
+      try { data = JSON.parse(txt); } catch {}
+      const err: any = new Error(Object.keys(data).length ? data.message : `API Error: ${res.status}`);
+      err.response = { data };
+      throw err;
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  },
+  async put(url: string, body: any) {
+    const token = getCookie('access_token');
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+        window.location.href = '/uiux/login';
+      }
+      const txt = await res.text();
+      let data: any = { message: txt };
+      try { data = JSON.parse(txt); } catch {}
+      const err: any = new Error(Object.keys(data).length ? data.message : `API Error: ${res.status}`);
+      err.response = { data };
+      throw err;
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  },
+
+  async delete(url: string) {
+    const token = getCookie('access_token');
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        document.cookie = 'access_token=; Max-Age=0; path=/;';
+        window.location.href = '/uiux/login';
+      }
+      const txt = await res.text();
+      let data: any = { message: txt };
+      try { data = JSON.parse(txt); } catch {}
+      const err: any = new Error(Object.keys(data).length ? data.message : `API Error: ${res.status}`);
+      err.response = { data };
+      throw err;
+    }
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   }
 };
 

@@ -11,25 +11,47 @@ import {
   DollarSign,
   Briefcase
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api';
 import { getCookie } from '../../utils/cookie';
 import { Role } from '../../../../iam/entities/role.enum';
-
-const TaskRequestFlowStatus: Record<string, { label: string; color: string; next: string }> = {
-  PROPOSED: { label: 'Đề xuất', color: 'bg-status-yellow', next: 'PM Ước tính' },
-  ESTIMATED: { label: 'PM Đã xác nhận', color: 'bg-accent-blue', next: 'Sale Chốt giá' },
-  PRICED: { label: 'Sale Đã báo giá', color: 'bg-purple-500', next: 'Khách hàng duyệt' },
-  CLIENT_SIGNED: { label: 'Khách hàng Đã duyệt', color: 'bg-status-green', next: 'CEO Ký xác nhận' },
-  CEO_SIGNED: { label: 'CEO Đã ký', color: 'bg-indigo-600', next: 'Phân phối Task' },
-  DISTRIBUTED: { label: 'Đang thực thi', color: 'bg-status-green', next: 'Hoàn tất' },
-};
+import CreateTaskRequestModal from './components/CreateTaskRequestModal';
+import TaskEstimateModal from './components/TaskEstimateModal';
+import TaskPricingModal from './components/TaskPricingModal';
+import ClientSignModal from './components/ClientSignModal';
+import CEOSignModal from './components/CEOSignModal';
+import DistributeWbsModal from './components/DistributeWbsModal';
+import AssignPmModal from './components/AssignPmModal';
+import StatusTracker from './components/StatusTracker';
+import AlertModal from '../../components/AlertModal';
+import { useAlert } from '../../hooks/useAlert';
 
 const TaskRequestFlow: React.FC = () => {
+  const { t } = useTranslation();
   const [requests, setRequests] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newRequest, setNewRequest] = useState({ title: '', description: '', projectId: 'PROJ-TEST' });
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [showEstimate, setShowEstimate] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [showClientSign, setShowClientSign] = useState(false);
+  const [showCEOSign, setShowCEOSign] = useState(false);
+  const [showDistribute, setShowDistribute] = useState(false);
+  const [showAssignPm, setShowAssignPm] = useState(false);
+  const [pms, setPms] = useState<any[]>([]);
+
+  const { alertConfig, showAlert, closeAlert } = useAlert();
+
+  const TaskRequestFlowStatus: Record<string, { label: string; color: string; next: string }> = {
+    PROPOSED: { label: t('task_request.status_proposed'), color: 'bg-status-yellow', next: t('task_request.next_step_pm_estimate') },
+    ESTIMATED: { label: t('task_request.status_estimated'), color: 'bg-accent-blue', next: t('task_request.next_step_sale_price') },
+    PRICED: { label: t('task_request.status_priced'), color: 'bg-purple-500', next: t('task_request.next_step_client_approve') },
+    CLIENT_SIGNED: { label: t('task_request.status_client_signed'), color: 'bg-status-green', next: t('task_request.next_step_ceo_sign') },
+    CEO_SIGNED: { label: t('task_request.status_ceo_signed'), color: 'bg-indigo-600', next: t('task_request.next_step_distribute') },
+    DISTRIBUTED: { label: t('task_request.status_distributed'), color: 'bg-status-green', next: t('task_request.next_step_complete') },
+    REJECTED: { label: t('task_request.status_rejected'), color: 'bg-red-600', next: t('task_request.next_step_new_request') },
+  };
 
   useEffect(() => {
     const userStr = getCookie('user');
@@ -37,15 +59,26 @@ const TaskRequestFlow: React.FC = () => {
       try { setUser(JSON.parse(userStr)); } catch {}
     }
     fetchRequests();
+    fetchPms();
   }, []);
+
+  const fetchPms = async () => {
+    try {
+      const pmList = await api.get('/iam/pm-list').catch(() => []);
+      setPms(Array.isArray(pmList) ? pmList : []);
+    } catch (err) { 
+      console.error('Error fetching PM list:', err); 
+    }
+  };
 
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/task-requests/list');
+      const res = await api.get('/task-requests/list').catch(() => []);
       setRequests(Array.isArray(res) ? res : []);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      showAlert(t('common.error'), err.response?.data?.message || t('task_request.error_fetch_requests'), 'error');
     } finally {
       setLoading(false);
     }
@@ -53,62 +86,137 @@ const TaskRequestFlow: React.FC = () => {
 
   const currentRole = user?.role || Role.VENDOR;
 
-  const handleCreate = async () => {
-    try {
-      await api.post('/task-requests/propose', { ...newRequest, clientId: user.id });
-      setShowCreate(false);
-      fetchRequests();
-    } catch (err) { console.error(err); }
-  };
-
   const handleAction = async (id: string, action: string, data: any = {}) => {
     try {
       await api.post(`/task-requests/${id}/${action}`, { ...data, userId: user.id });
       fetchRequests();
-    } catch (err) { console.error(err); }
+    } catch (err: any) { 
+      console.error(err); 
+      showAlert(t('common.error'), err.response?.data?.message || t('common.error_occurred'), 'error');
+    }
+  };
+
+  const handleEstimate = async (id: string, hours: number, signature?: string, publicKey?: string, type?: string) => {
+    await api.post(`/task-requests/${id}/estimate`, { hours, pmId: user.id, signature, publicKey, type: type || 'FEATURE' });
+  };
+
+  const handleSetPrice = async (id: string, price: number) => {
+    await api.post(`/task-requests/${id}/price`, { price, saleId: user.id });
+  };
+
+  const handleClientSign = async (id: string, signature: string, publicKey: string) => {
+    await api.post(`/task-requests/${id}/client-sign`, { signature, publicKey });
+  };
+
+  const handleCEOSign = async (id: string, signature: string, publicKey: string) => {
+    await api.post(`/task-requests/${id}/ceo-sign`, { signature, publicKey });
+  };
+
+  const handleDistribute = async (id: string) => {
+    await api.post(`/task-requests/${id}/distribute`, { pmId: user.id });
+  };
+
+  const handleAssignPm = async (pmId: string) => {
+    try {
+      await api.post(`/task-requests/${selectedRequest.id}/assign-pm`, { pmId, userId: user.id });
+      fetchRequests();
+      setShowAssignPm(false);
+      showAlert(t('common.success'), t('task_request.pm_assigned_success'), 'success');
+    } catch (err: any) {
+      showAlert(t('common.error'), err.response?.data?.message || t('task_request.error_assign_pm'), 'error');
+    }
+  };
+
+  const handleCreateSuccess = () => {
+    setShowCreate(false);
+    fetchRequests();
+    showAlert(t('common.success'), t('task_request.create_success_msg'), 'success');
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black text-white italic tracking-tight">Ký duyệt Task Request (PKI 3-Step)</h3>
-        {currentRole === Role.CLIENT && (
+        <h3 className="text-xl font-black text-white italic tracking-tight uppercase underline decoration-accent-blue/30 decoration-4 underline-offset-8">
+           {t('task_request.title')}
+        </h3>
+        {(currentRole === Role.CLIENT || currentRole === Role.SALE || currentRole === Role.CEO) && (
           <button 
              onClick={() => setShowCreate(true)}
-             className="px-4 py-2 bg-accent-blue text-white rounded-xl font-bold text-xs flex items-center gap-2 hover:shadow-lg transition-all"
+             className="px-6 py-3 bg-accent-blue text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
           >
-            <Plus className="w-4 h-4" /> Đề xuất Task mới
+            <Plus className="w-4 h-4" /> {currentRole === Role.SALE ? t('task_request.btn_new_cr') : t('task_request.btn_new_task')}
           </button>
         )}
       </div>
 
-      {showCreate && (
-        <div className="bg-bg-card p-6 rounded-2xl border border-accent-blue/30 space-y-4">
-          <input 
-            type="text" 
-            placeholder="Tên yêu cầu/CR..." 
-            className="w-full bg-bg-surface border border-slate-700 p-3 rounded-xl text-white outline-none"
-            value={newRequest.title}
-            onChange={e => setNewRequest({...newRequest, title: e.target.value})}
-          />
-          <textarea 
-            placeholder="Mô tả chi tiết yêu cầu..." 
-            className="w-full bg-bg-surface border border-slate-700 p-3 rounded-xl text-white outline-none h-24"
-            value={newRequest.description}
-            onChange={e => setNewRequest({...newRequest, description: e.target.value})}
-          />
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setShowCreate(false)} className="text-xs font-bold text-text-secondary">Hủy</button>
-            <button onClick={handleCreate} className="px-4 py-2 bg-accent-blue text-white rounded-lg font-bold text-xs">Gửi đề xuất</button>
-          </div>
-        </div>
-      )}
+      <CreateTaskRequestModal 
+        isOpen={showCreate} 
+        onClose={() => setShowCreate(false)} 
+        onSuccess={handleCreateSuccess} 
+        currentRole={currentRole} 
+        userId={user?.id}
+        showAlert={showAlert}
+      />
+
+      <TaskEstimateModal 
+        isOpen={showEstimate}
+        onClose={() => setShowEstimate(false)}
+        onSuccess={() => { setShowEstimate(false); fetchRequests(); showAlert(t('common.success'), t('task_request.estimate_success'), 'success'); }}
+        request={selectedRequest}
+        onEstimate={handleEstimate}
+        showAlert={showAlert}
+      />
+
+      <TaskPricingModal 
+        isOpen={showPricing}
+        onClose={() => setShowPricing(false)}
+        onSuccess={() => { setShowPricing(false); fetchRequests(); showAlert(t('common.success'), t('task_request.price_success'), 'success'); }}
+        request={selectedRequest}
+        onPrice={handleSetPrice}
+        showAlert={showAlert}
+      />
+
+      <ClientSignModal 
+        isOpen={showClientSign}
+        onClose={() => setShowClientSign(false)}
+        onSuccess={() => { setShowClientSign(false); fetchRequests(); showAlert(t('common.success'), t('task_request.client_sign_success'), 'success'); }}
+        request={selectedRequest}
+        onSign={handleClientSign}
+        showAlert={showAlert}
+      />
+
+      <CEOSignModal 
+        isOpen={showCEOSign}
+        onClose={() => setShowCEOSign(false)}
+        onSuccess={() => { setShowCEOSign(false); fetchRequests(); showAlert(t('common.success'), t('task_request.ceo_sign_success'), 'success'); }}
+        request={selectedRequest}
+        onSign={handleCEOSign}
+        showAlert={showAlert}
+      />
+
+      <DistributeWbsModal 
+        isOpen={showDistribute}
+        onClose={() => setShowDistribute(false)}
+        onSuccess={() => { setShowDistribute(false); fetchRequests(); showAlert(t('common.success'), t('task_request.distribute_success'), 'success'); }}
+        request={selectedRequest}
+        onDistribute={handleDistribute}
+        showAlert={showAlert}
+      />
+
+      <AssignPmModal
+        isOpen={showAssignPm}
+        onClose={() => setShowAssignPm(false)}
+        onSuccess={handleAssignPm}
+        request={selectedRequest}
+        pms={pms}
+        showAlert={showAlert}
+      />
 
       <div className="space-y-4">
         {requests.map((req, idx) => (
           <div key={idx} className="bg-bg-card p-6 rounded-2xl border border-slate-700/50 hover:border-slate-500 transition-all shadow-xl group relative overflow-hidden">
             <div className={`absolute top-0 right-0 p-1 px-3 text-[9px] font-black uppercase text-white ${TaskRequestFlowStatus[req.status]?.color || 'bg-slate-700'}`}>
-              {req.status}
+              {TaskRequestFlowStatus[req.status]?.label || req.status}
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -121,87 +229,105 @@ const TaskRequestFlow: React.FC = () => {
                  </div>
                  <p className="text-[11px] text-text-secondary leading-relaxed line-clamp-2 italic">{req.description}</p>
                  <div className="flex flex-wrap gap-4 pt-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5"><Clock className="w-3 h-3"/> Effort: {req.estimatedHours || '??'}h</span>
-                    <span className="text-[10px] font-bold text-status-green uppercase flex items-center gap-1.5"><DollarSign className="w-3 h-3"/> Cost: {req.finalPrice || '??'} USD</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5"><Clock className="w-3 h-3"/> {t('task_request.label_effort')}: {req.estimatedHours || '??'}h</span>
+                    <span className="text-[10px] font-bold text-status-green uppercase flex items-center gap-1.5"><DollarSign className="w-3 h-3"/> {t('task_request.label_cost')}: {req.finalPrice || '??'} VNĐ</span>
+                    {req.pmId && (
+                      <span className="text-[10px] font-bold text-accent-blue uppercase flex items-center gap-1.5 italic"><Briefcase className="w-3 h-3"/> {t('task_request.label_pm_assigned')}</span>
+                    )}
+                    {req.type && (
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border ${
+                        req.type === 'BUG' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                        req.type === 'NEW_PROJECT' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' :
+                        'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                      }`}>{req.type === 'BUG' ? t('task_request.type_bug') : req.type === 'NEW_PROJECT' ? t('task_request.type_new_project') : t('task_request.type_feature')}</span>
+                    )}
                  </div>
               </div>
 
               {/* Action Center per Role */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 z-10 relative">
+                 {req.status === 'PROPOSED' && (currentRole === Role.SALE || currentRole === Role.CEO) && !req.pmId && (
+                   <button 
+                     onClick={() => { 
+                       fetchPms();
+                       setSelectedRequest(req); 
+                       setShowAssignPm(true); 
+                     }}
+                     className="px-4 py-2 bg-orange-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-orange-500/20 italic"
+                   >
+                     {t('task_request.btn_assign_pm')}
+                   </button>
+                 )}
                  {req.status === 'PROPOSED' && currentRole === Role.PM && (
                    <button 
-                     onClick={() => handleAction(req.id, 'estimate', { hours: 24, signature: 'SIG_PM_X1' })}
-                     className="px-4 py-2 bg-accent-blue text-white rounded-xl font-bold text-xs shadow-lg shadow-blue-500/20"
+                     onClick={() => { setSelectedRequest(req); setShowEstimate(true); }}
+                     className="px-4 py-2 bg-accent-blue text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-blue-500/20 italic"
                    >
-                     🚀 PM Chốt Effort (Step 1)
+                     {t('task_request.btn_input_effort')}
                    </button>
                  )}
                  {req.status === 'ESTIMATED' && currentRole === Role.SALE && (
                    <button 
-                     onClick={() => handleAction(req.id, 'price', { price: 1200 })}
-                     className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-purple-500/20"
+                     onClick={() => { setSelectedRequest(req); setShowPricing(true); }}
+                     className="px-4 py-2 bg-purple-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-purple-500/20 italic"
                    >
-                     💰 Sale Chốt Giá
+                     {t('task_request.btn_sale_price')}
                    </button>
                  )}
                  {req.status === 'PRICED' && currentRole === Role.CLIENT && (
                    <button 
-                     onClick={() => handleAction(req.id, 'client-sign', { signature: 'SIG_CLIENT_X2' })}
-                     className="px-4 py-2 bg-status-green text-white rounded-xl font-bold text-xs shadow-lg shadow-green-500/20"
+                     onClick={() => { setSelectedRequest(req); setShowClientSign(true); }}
+                     className="px-4 py-2 bg-status-green text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-green-500/20 italic flex items-center gap-2"
                    >
-                     ✍️ Khách hàng Ký duyệt (Step 2)
+                     <ShieldCheck className="w-4 h-4" /> {t('task_request.btn_client_approve_pki')}
                    </button>
                  )}
                  {req.status === 'CLIENT_SIGNED' && currentRole === Role.CEO && (
                    <button 
-                     onClick={() => handleAction(req.id, 'ceo-sign', { ceoId: user.id, signature: 'SIG_CEO_X3' })}
-                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/20"
+                     onClick={() => { setSelectedRequest(req); setShowCEOSign(true); }}
+                     className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 italic flex items-center gap-2"
                    >
-                     🏢 CEO Ký xác nhận (Step 3)
+                     <ShieldCheck className="w-4 h-4 ml-1" /> {t('task_request.btn_ceo_approve_pki')}
                    </button>
                  )}
                  {req.status === 'CEO_SIGNED' && currentRole === Role.PM && (
                    <button 
-                     onClick={() => handleAction(req.id, 'distribute')}
-                     className="px-4 py-2 bg-status-green text-white rounded-xl font-bold text-xs"
+                    onClick={() => { setSelectedRequest(req); setShowDistribute(true); }}
+                    className="px-4 py-2 bg-status-green text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic flex items-center gap-2"
                    >
-                     ✅ Phân phối WBS cho Dev
+                    <Zap className="w-4 h-4" /> {t('task_request.btn_activate_execution')}
                    </button>
                  )}
+                 {req.status === 'REJECTED' && currentRole === Role.SALE && (
+                    <button 
+                     onClick={() => setShowCreate(true)}
+                     className="px-4 py-2 bg-red-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest italic flex items-center gap-2 shadow-lg shadow-red-500/20"
+                    >
+                     {t('task_request.btn_pm_rejected_new')}
+                    </button>
+                  )}
               </div>
             </div>
 
-            {/* Visual Steps Tracker */}
-            <div className="mt-8 pt-6 border-t border-slate-800/50 flex justify-between items-center relative gap-2">
-               {[
-                 { label: 'PM Ký', st: 'ESTIMATED' },
-                 { label: 'Sale Giá', st: 'PRICED' },
-                 { label: 'Khách Ký', st: 'CLIENT_SIGNED' },
-                 { label: 'CEO Ký', st: 'CEO_SIGNED' },
-                 { label: 'WBS', st: 'DISTRIBUTED' },
-               ].map((step, sidx) => {
-                 const isDone = requests.findIndex(r => r.id === req.id && r.status === step.st) >= 0 || (sidx === 0 && req.status !== 'PROPOSED');
-                 // This logic is a bit crude for demo, in reality we'd check status precedence
-                 return (
-                   <div key={sidx} className={`flex items-center gap-1.5 ${sidx > 0 && 'flex-1 justify-center'}`}>
-                     <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${req.status === step.st ? 'bg-accent-blue text-white animate-pulse' : 'bg-bg-surface text-slate-700 border border-slate-700/30'}`}>
-                       {sidx + 1}
-                     </div>
-                     <span className={`text-[9px] font-bold uppercase tracking-tight ${req.status === step.st ? 'text-white' : 'text-slate-700'}`}>{step.label}</span>
-                     {sidx < 4 && <ChevronRight className="w-3 h-3 text-slate-800" />}
-                   </div>
-                 )
-               })}
-            </div>
+            <StatusTracker currentStatus={req.status} />
           </div>
         ))}
         {requests.length === 0 && !loading && (
           <div className="bg-bg-card/50 p-12 rounded-3xl border border-dashed border-slate-700 flex flex-col items-center justify-center text-center opacity-60">
              <Plus className="w-8 h-8 text-slate-600 mb-4" />
-             <p className="text-xs font-bold text-slate-500 italic">Chưa có yêu cầu Task/CR nào cần phê duyệt.</p>
+             <p className="text-xs font-bold text-slate-500 italic">{t('task_request.no_requests')}</p>
           </div>
         )}
       </div>
+
+      <AlertModal 
+        isOpen={alertConfig.isOpen}
+        onClose={closeAlert}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onConfirm={alertConfig.onConfirm}
+      />
     </div>
   );
 };

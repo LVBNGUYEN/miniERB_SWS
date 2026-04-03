@@ -94,7 +94,11 @@ export class QuotationService {
         throw new BadRequestException('Only DRAFT quotations can be submitted.');
       }
     } else if (user.role === Role.CLIENT || user.role === Role.CEO) {
-      if (user.role === Role.CLIENT && quotation.clientId !== user.id) {
+      const actualUserId = user.id || user.userId || user.sub;
+      if (user.role === Role.CLIENT && quotation.clientId !== actualUserId) {
+        console.log('--- IDOR TRIGGERED ---');
+        console.log('Quotation Client ID:', quotation.clientId);
+        console.log('User ID:', actualUserId);
         throw new ForbiddenException('You do not have permission to approve or reject this quotation. (IDOR Prevented)');
       }
       if (updateDto.status !== QuotationStatus.APPROVED && updateDto.status !== QuotationStatus.REJECTED) {

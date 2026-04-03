@@ -12,6 +12,7 @@ import { Timesheet } from '../timesheet/entities/timesheet.entity';
 import { InvoiceService } from './services/invoice.service';
 import { PaymentService } from './services/payment.service';
 import { PnLService } from './services/pnl.service';
+import { FinanceCronService } from './services/finance-cron.service';
 
 // Controllers
 import { FinanceController } from './controllers/finance.controller';
@@ -33,6 +34,7 @@ import { TimeAndMaterialPnLStrategy } from './strategies/pnl/time-material.strat
     PnLService,
     FixedPricePnLStrategy,
     TimeAndMaterialPnLStrategy,
+    FinanceCronService,
   ],
   exports: [InvoiceService, PaymentService, PnLService],
 })

@@ -22,21 +22,21 @@ export class TaskController {
   }
 
   @Get()
-  @Roles(Role.CEO, Role.PM, Role.VENDOR, Role.CLIENT)
+  @Roles(Role.CEO, Role.PM, Role.VENDOR, Role.CLIENT, Role.DEV)
   @ApiOperation({ summary: 'Get all tasks with role-based filtering' })
   async findAll(@Req() req: any, @Query('projectId') projectId?: string) {
     return this.taskService.findAll(req.user, projectId);
   }
 
   @Get(':id')
-  @Roles(Role.CEO, Role.PM, Role.VENDOR, Role.CLIENT)
+  @Roles(Role.CEO, Role.PM, Role.VENDOR, Role.CLIENT, Role.DEV)
   @ApiOperation({ summary: 'Get a single task by ID' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.taskService.findOne(id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
+    return this.taskService.findOne(id, req.user);
   }
 
   @Put(':id')
-  @Roles(Role.CEO, Role.PM, Role.VENDOR)
+  @Roles(Role.CEO, Role.PM, Role.VENDOR, Role.DEV)
   @ApiOperation({ summary: 'Update a task' })
   async updateTask(@Param('id', ParseUUIDPipe) id: string, @Body() updateDto: UpdateTaskDto, @Req() req: any) {
     // VENDORs normally shouldn't update EVERYTHING, they can only update status.

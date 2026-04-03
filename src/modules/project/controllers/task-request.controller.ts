@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, UseInterceptors } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, UseInterceptors, HttpCode } from '@nestjs/common';
 import { TaskRequestService } from '../services/task-request.service';
 import { AuditInterceptor } from '../../sys-audit/interceptors/audit.interceptor';
 
@@ -8,13 +8,24 @@ export class TaskRequestController {
   constructor(private readonly taskRequestService: TaskRequestService) {}
 
   @Post('propose')
+  @HttpCode(201)
   async propose(@Body() body: any) {
-    return this.taskRequestService.createRequest(body.clientId, body.projectId, body.title, body.description);
+    return this.taskRequestService.createRequest(body.clientId, body.projectId, body.title, body.description, body.pmId, body.saleId);
+  }
+
+  @Post(':id/assign-pm')
+  async assignPm(@Param('id') id: string, @Body() body: any) {
+    return this.taskRequestService.assignPm(id, body.pmId);
   }
 
   @Post(':id/estimate')
   async pmEstimate(@Param('id') id: string, @Body() body: any) {
-    return this.taskRequestService.pmEstimate(id, body.pmId, body.hours, body.signature);
+    return this.taskRequestService.pmEstimate(id, body.pmId, body.hours, body.type, body.signature);
+  }
+
+  @Post(':id/reject')
+  async pmReject(@Param('id') id: string, @Body() body: any) {
+    return this.taskRequestService.pmReject(id, body.pmId);
   }
 
   @Post(':id/price')
@@ -33,6 +44,7 @@ export class TaskRequestController {
   }
 
   @Post(':id/distribute')
+  @HttpCode(201)
   async distribute(@Param('id') id: string) {
     return this.taskRequestService.distributeTask(id);
   }

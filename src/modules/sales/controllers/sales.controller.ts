@@ -30,10 +30,10 @@ export class SalesController {
   }
 
   @Get('contracts')
-  @Roles(Role.CEO, Role.PM, Role.SALE)
-  @ApiOperation({ summary: 'List all contracts' })
-  async listContracts() {
-    return this.contractService.findAllContracts();
+  @Roles(Role.CEO, Role.PM, Role.SALE, Role.CLIENT)
+  @ApiOperation({ summary: 'List all contracts (Filtered by role)' })
+  async listContracts(@CurrentUser() user: any) {
+    return this.contractService.findAllContracts(user);
   }
 
   @Get('contracts/stats')

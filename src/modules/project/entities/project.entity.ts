@@ -51,7 +51,13 @@ export class Project extends AbstractEntity {
   description: string;
 
   @Column({ name: 'estimated_budget', type: 'decimal', precision: 12, scale: 2, default: 0 })
-  estimatedBudget: number;
+  totalEstimatedBudget: number;
+
+  @Column({ name: 'total_estimated_hours', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  totalEstimatedHours: number;
+
+  @Column({ name: 'total_actual_hours', type: 'decimal', precision: 8, scale: 2, default: 0 })
+  totalActualHours: number;
 
   @Column({ name: 'start_date', type: 'timestamp', nullable: true })
   startDate: Date;

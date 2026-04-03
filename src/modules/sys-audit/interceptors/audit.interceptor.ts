@@ -37,7 +37,7 @@ export class AuditInterceptor implements NestInterceptor {
           const tableName = auditMetadata.tableName;
           
           // Identify recordId from response if possible, or params
-          const recordId = response?.id || params?.id;
+          const recordId = response?.id || params?.id || params?.projectId;
 
           await this.auditService.createLog({
             userId: user?.id,

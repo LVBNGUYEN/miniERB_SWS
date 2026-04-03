@@ -36,3 +36,7 @@ coverage/
 test/
 /test/
 **/test/
+*.log
+e2e_result.json
+.grapuco/
+src/modules/system/e2e-testing.service.ts

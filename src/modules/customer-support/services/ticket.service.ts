@@ -98,6 +98,24 @@ export class TicketService {
     }
   }
 
+  async findAllTickets(user: any): Promise<Ticket[]> {
+    const userId = user.id || user.userId || user.sub;
+    const query = this.ticketRepository.createQueryBuilder('ticket')
+      .leftJoinAndSelect('ticket.project', 'project')
+      .leftJoinAndSelect('ticket.client', 'client')
+      .leftJoinAndSelect('ticket.blameUser', 'blameUser');
+
+    // CEO and PM see all tickets, CLIENT sees their own, VENDOR/DEV see projects they are assigned to
+    if (user.role === 'CLIENT') {
+      query.andWhere('ticket.clientId = :userId', { userId });
+    } else if (user.role === 'VENDOR' || user.role === 'DEV') {
+      query.innerJoin('prj_tasks', 't', 't.project_id = ticket.project_id AND t.assignee_id = :userId', { userId });
+    }
+
+    query.orderBy('ticket.createdAt', 'DESC');
+    return query.getMany();
+  }
+
   async getTicketsByProject(projectId: string) {
     return this.ticketRepository.find({
       where: { projectId },

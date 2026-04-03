@@ -37,6 +37,15 @@ export class Invoice extends AbstractEntity {
   @Column({ name: 'due_date', type: 'date' })
   dueDate: Date;
 
+  @Column({ name: 'contract_id', type: 'uuid', nullable: true })
+  contractId: string;
+
+  @Column({ name: 'payment_date', type: 'timestamp', nullable: true })
+  paymentDate: Date;
+
+  @Column({ name: 'pki_payment_signature', type: 'text', nullable: true })
+  pkiPaymentSignature: string;
+
   @Column({ length: 50 })
   status: string;
 }

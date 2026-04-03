@@ -47,10 +47,9 @@ export class TicketController {
   }
 
   @Get('tickets/me')
-  @Roles(Role.CEO, Role.PM, Role.CLIENT)
-  @ApiOperation({ summary: 'Get current user tickets' })
-  async getMyTickets() {
-    // This is a placeholder for filtering logic; the service should handle the user context
-    return this.ticketService.getTicketsByProject(''); // Fix this later with proper user based filter
+  @Roles(Role.CEO, Role.PM, Role.CLIENT, Role.VENDOR, Role.DEV)
+  @ApiOperation({ summary: 'Get role-filtered tickets for Support Dashboard' })
+  async getMyTickets(@Req() req: any) {
+    return this.ticketService.findAllTickets(req.user);
   }
 }

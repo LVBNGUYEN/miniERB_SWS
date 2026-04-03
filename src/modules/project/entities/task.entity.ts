@@ -3,7 +3,7 @@ import { AbstractEntity } from '../../../common/abstract.entity';
 import { Project } from './project.entity';
 import { User } from '../../iam/entities/user.entity';
 import { TaskStatus } from './task-status.enum';
-import { Timesheet } from './timesheet.entity';
+import { Timesheet } from '../../timesheet/entities/timesheet.entity';
 
 @Entity('prj_tasks')
 export class Task extends AbstractEntity {

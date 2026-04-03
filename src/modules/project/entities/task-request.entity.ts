@@ -11,11 +11,12 @@ export enum TaskRequestStatus {
   CLIENT_SIGNED = 'CLIENT_SIGNED',
   CEO_SIGNED = 'CEO_SIGNED',
   DISTRIBUTED = 'DISTRIBUTED',
+  REJECTED = 'REJECTED',
 }
 
 @Entity('prj_task_requests')
 export class TaskRequest extends AbstractEntity {
-  @Column({ name: 'project_id', type: 'uuid' })
+  @Column({ name: 'project_id', type: 'uuid', nullable: true })
   projectId: string;
 
   @ManyToOne(() => Project)
@@ -71,4 +72,7 @@ export class TaskRequest extends AbstractEntity {
     ceoSignature?: string;
     ceoSignedAt?: Date;
   };
+
+  @Column({ length: 50, default: 'FEATURE' })
+  type: string;
 }

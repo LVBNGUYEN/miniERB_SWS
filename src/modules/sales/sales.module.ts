@@ -11,11 +11,12 @@ import { SysAuditModule } from '../sys-audit/sys-audit.module';
 import { QuotationService } from './services/quotation.service';
 import { QuotationController } from './controllers/quotation.controller';
 import { CustomerSupportModule } from '../customer-support/customer-support.module';
+import { forwardRef } from '@nestjs/common';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contract, Quotation, ContractMilestone]),
-    PkiModule,
+    forwardRef(() => PkiModule),
     ProjectModule,
     SysAuditModule,
     CustomerSupportModule

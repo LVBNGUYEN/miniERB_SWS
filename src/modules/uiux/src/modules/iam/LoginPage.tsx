@@ -10,11 +10,13 @@ import {
    Globe,
    Bot
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { setCookie } from '../../utils/cookie';
 
 const LoginPage: React.FC = () => {
+   const { t } = useTranslation();
    const [showPassword, setShowPassword] = useState(false);
    const [email, setEmail] = useState('');
    const [password, setPassword] = useState('');
@@ -34,7 +36,7 @@ const LoginPage: React.FC = () => {
          setCookie('user', JSON.stringify(res.user), expiryDays);
          navigate('/');
       } catch (err) {
-         setError('Đăng nhập thất bại. Kiểm tra lại thông tin.');
+         setError(t('login.error_failed'));
          console.error(err);
       } finally {
          setLoading(false);
@@ -61,8 +63,8 @@ const LoginPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-4 pt-8">
-                     <h1 className="text-4xl font-extrabold text-white leading-tight">Nền tảng Quản trị Chiến lược toàn cầu.</h1>
-                     <p className="text-blue-100/70 text-sm font-medium leading-relaxed max-w-[280px]">Tối ưu hóa nguồn lực, tài chính và quy trình doanh nghiệp.</p>
+                     <h1 className="text-4xl font-extrabold text-white leading-tight">{t('login.branding_title')}</h1>
+                     <p className="text-blue-100/70 text-sm font-medium leading-relaxed max-w-[280px]">{t('login.branding_subtitle')}</p>
                   </div>
                </div>
 
@@ -72,8 +74,8 @@ const LoginPage: React.FC = () => {
                         <ShieldCheck className="w-5 h-5 text-white" />
                      </div>
                      <div>
-                        <p className="text-xs font-black text-white uppercase tracking-widest">Bảo mật PKI CA</p>
-                        <p className="text-[10px] text-blue-100/50 font-medium">Mã hóa dữ liệu chuẩn quốc tế.</p>
+                        <p className="text-xs font-black text-white uppercase tracking-widest">{t('login.shield_title')}</p>
+                        <p className="text-[10px] text-blue-100/50 font-medium">{t('login.shield_desc')}</p>
                      </div>
                   </div>
 
@@ -82,8 +84,8 @@ const LoginPage: React.FC = () => {
                         <Globe className="w-5 h-5 text-white" />
                      </div>
                      <div>
-                        <p className="text-xs font-black text-white uppercase tracking-widest">Đa Quốc Gia</p>
-                        <p className="text-[10px] text-blue-100/50 font-medium">Hỗ trợ chi nhánh VN, JP, US.</p>
+                        <p className="text-xs font-black text-white uppercase tracking-widest">{t('login.globe_title')}</p>
+                        <p className="text-[10px] text-blue-100/50 font-medium">{t('login.globe_desc')}</p>
                      </div>
                   </div>
                </div>
@@ -97,9 +99,9 @@ const LoginPage: React.FC = () => {
             <div className="flex-1 bg-bg-card p-12 lg:p-20 flex flex-col justify-center">
                <div className="max-w-[360px] mx-auto w-full space-y-10">
                   <div className="space-y-2">
-                     <h2 className="text-3xl font-black text-text-primary tracking-tight italic">Đăng nhập</h2>
+                     <h2 className="text-3xl font-black text-text-primary tracking-tight italic">{t('login.title')}</h2>
                      <p className="text-text-secondary text-sm font-bold flex items-center gap-2">
-                        Chào mừng bạn đến với AMIT ERP.
+                        {t('login.subtitle')}
                         <span className="w-1.5 h-1.5 rounded-full bg-status-green shadow-[0_0_8px_rgba(22,163,74,0.6)]"></span>
                      </p>
                   </div>
@@ -112,7 +114,7 @@ const LoginPage: React.FC = () => {
 
                   <form onSubmit={handleLogin} className="space-y-6">
                      <div className="space-y-2 group">
-                        <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] ml-1 group-focus-within:text-accent-blue transition-colors">Tài khoản</label>
+                        <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] ml-1 group-focus-within:text-accent-blue transition-colors">{t('login.label_account')}</label>
                         <div className="relative">
                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-accent-blue transition-colors">
                               <Mail className="w-4 h-4" />
@@ -121,7 +123,7 @@ const LoginPage: React.FC = () => {
                               type="email"
                               value={email}
                               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                              placeholder="Email"
+                              placeholder={t('login.placeholder_email')}
                               className="w-full bg-bg-surface border border-border-primary rounded-2xl py-3.5 pl-12 pr-4 text-sm text-text-primary placeholder:text-text-secondary outline-none focus:border-accent-blue focus:ring-4 focus:ring-accent-blue/5 transition-all font-medium"
                               required
                            />
@@ -130,8 +132,8 @@ const LoginPage: React.FC = () => {
 
                      <div className="space-y-2 group">
                         <div className="flex justify-between items-center ml-1">
-                           <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] group-focus-within:text-accent-blue transition-colors">Mật khẩu</label>
-                           <button type="button" className="text-[10px] font-black text-accent-blue hover:underline uppercase tracking-tight">Quên mật khẩu?</button>
+                           <label className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em] group-focus-within:text-accent-blue transition-colors">{t('login.label_password')}</label>
+                           <button type="button" className="text-[10px] font-black text-accent-blue hover:underline uppercase tracking-tight">{t('login.forgot_password')}</button>
                         </div>
                         <div className="relative">
                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-accent-blue transition-colors">
@@ -164,7 +166,7 @@ const LoginPage: React.FC = () => {
                            className="w-4 h-4 rounded border-border-primary bg-bg-surface text-accent-blue focus:ring-accent-blue/20 cursor-pointer"
                         />
                         <label htmlFor="remember" className="text-xs font-bold text-text-secondary cursor-pointer hover:text-text-primary transition-colors">
-                           Ghi nhớ đăng nhập
+                           {t('login.remember_me')}
                         </label>
                      </div>
 
@@ -173,7 +175,7 @@ const LoginPage: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-gradient-to-r from-accent-blue to-indigo-600 text-white rounded-2xl py-4 font-black flex items-center justify-center gap-3 text-sm hover:translate-y-[-2px] hover:shadow-2xl hover:shadow-accent-blue/25 transition-all active:translate-y-[1px] disabled:opacity-50"
                      >
-                        {loading ? 'ĐANG XỬ LÝ...' : 'ĐĂNG NHẬP'}
+                        {loading ? t('login.loading') : t('login.btn_login')}
                         {!loading && <ArrowRight className="w-5 h-5" />}
                      </button>
                   </form>

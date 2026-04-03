@@ -4,6 +4,9 @@ import { DataSource } from 'typeorm';
 import { User } from './modules/iam/entities/user.entity';
 import { Quotation } from './modules/sales/entities/quotation.entity';
 import { QuotationStatus } from './modules/sales/entities/quotation-status.enum';
+import { Project } from './modules/project/entities/project.entity';
+import { ProjectStatus } from './modules/project/entities/project-status.enum';
+import { Invoice } from './modules/finance/entities/invoice.entity';
 import { Branch } from './modules/system/entities/branch.entity';
 import * as bcrypt from 'bcrypt';
 
@@ -107,32 +110,76 @@ async function bootstrap() {
       await userRepository.save(client);
     }
 
-    // 2. Tạo Báo Giá (Luồng 1) chốt sẵn
+    // 2. Tạo Báo Giá (Leads)
     const quotationRepository = dataSource.getRepository(Quotation);
-    console.log('⏳ Gieo Báo giá (Quotation)...');
+    console.log('⏳ Gieo 18 Báo giá (Leads/Opportunities)...');
     
-    let quotation = await quotationRepository.findOne({ where: { title: 'App Mobile Vietcombank (Giai đoạn 1)' } });
-    if (!quotation) {
-      quotation = quotationRepository.create({
-        branchId: hqBranch.id,
-        clientId: client.id,
-        pmId: pm.id,
-        title: 'App Mobile Vietcombank (Giai đoạn 1)',
-        totalEstimatedHours: 500,
-        totalAmount: 150000000, 
-        status: QuotationStatus.DRAFT,
-        validUntil: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), 
-      });
-      await quotationRepository.save(quotation);
-    } else {
-      // Cleanup existing test artifacts
-      await dataSource.query(`TRUNCATE TABLE fin_payments, fin_invoices, fin_vendor_debts, tms_timesheets, prj_tasks, prj_projects, sls_contracts CASCADE`);
-      
-      // Update references to new client/pm
-      quotation.clientId = client.id;
-      quotation.pmId = pm.id;
-      quotation.status = QuotationStatus.DRAFT;
-      await quotationRepository.save(quotation);
+    const quotations: Quotation[] = [];
+    const leadProjects = [
+      'App Mobile Vietcombank (Phase 1)',
+      'Hệ thống ERP VinFast',
+      'AI Chatbot cho Techcombank',
+      'Cổng thanh toán MoMo Integration',
+      'Hệ thống quản lý kho TH True Milk'
+    ];
+
+    for (let i = 0; i < 18; i++) {
+        const title = leadProjects[i] || `Dự án tiềm năng #${i+1}`;
+        const amount = 200000000 + (Math.random() * 800000000);
+        const hours = 400 + Math.floor(Math.random() * 1000);
+        
+        const q = quotationRepository.create({
+          branchId: hqBranch.id,
+          clientId: client.id,
+          pmId: pm.id,
+          title: title,
+          totalEstimatedHours: hours,
+          totalAmount: amount,
+          status: i < 4 ? QuotationStatus.APPROVED : QuotationStatus.DRAFT,
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        });
+        quotations.push(await quotationRepository.save(q));
+    }
+
+    // 3. Tạo 4 Dự án đang chạy (Từ 4 Quotation COMPLETED)
+    const projectRepository = dataSource.getRepository(Project);
+    console.log('⏳ Gieo 4 Dự án đang thực thi...');
+    
+    const projects: Project[] = [];
+    for (let i = 0; i < 4; i++) {
+        const p = projectRepository.create({
+          quotationId: quotations[i].id,
+          branchId: hqBranch.id,
+          pmId: pm.id,
+          clientId: client.id,
+          name: quotations[i].title,
+          totalEstimatedBudget: quotations[i].totalAmount,
+          totalEstimatedHours: quotations[i].totalEstimatedHours,
+          totalActualHours: quotations[i].totalEstimatedHours * 0.4, // Done 40%
+          status: ProjectStatus.IN_PROGRESS,
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        });
+        projects.push(await projectRepository.save(p));
+    }
+
+    // 4. Tạo Hóa đơn (Finance)
+    const invoiceRepository = dataSource.getRepository(Invoice);
+    console.log('⏳ Gieo Hóa đơn (Finance)...');
+    
+    for (let i = 0; i < 2; i++) {
+        const inv = invoiceRepository.create({
+          projectId: projects[i].id,
+          branchId: hqBranch.id,
+          invoiceNumber: `INV-2026-00${i+1}`,
+          subtotalAmount: projects[i].totalEstimatedBudget * 0.3, // Deposit 30%
+          vatAmount: projects[i].totalEstimatedBudget * 0.03,
+          totalAmount: projects[i].totalEstimatedBudget * 0.33,
+          issueDate: new Date(),
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          status: i === 0 ? 'PAID' : 'DRAFT',
+          paymentDate: i === 0 ? new Date() : null,
+        });
+        await invoiceRepository.save(inv);
     }
 
     console.log('✅ Gieo Data XONG! Dữ liệu của bạn:');

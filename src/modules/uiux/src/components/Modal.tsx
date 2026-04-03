@@ -1,14 +1,18 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer }) => {
+  const { t } = useTranslation();
+  
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -50,12 +54,14 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
 
         {/* Footer */}
         <div className="px-8 py-6 bg-bg-surface/30 border-t border-border-primary flex justify-end gap-3">
-          <button 
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl bg-bg-surface text-text-primary font-bold text-sm hover:bg-slate-700/10 dark:hover:bg-slate-800 transition-all border border-border-primary"
-          >
-            Đóng
-          </button>
+          {footer ? footer : (
+            <button 
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl bg-bg-surface text-text-primary font-bold text-sm hover:bg-slate-700/10 dark:hover:bg-slate-800 transition-all border border-border-primary"
+            >
+              {t('common.close')}
+            </button>
+          )}
         </div>
       </div>
     </div>

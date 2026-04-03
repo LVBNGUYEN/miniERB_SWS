@@ -29,63 +29,88 @@ export class PnLService {
       throw new NotFoundException('Project or Quotation not found');
     }
 
-    // 1. Get Revenue (Approved Invoices)
-    const { totalRevenue } = await this.dataSource
-      .getRepository(Invoice)
-      .createQueryBuilder('inv')
-      .select('SUM(inv.total_amount)', 'totalRevenue')
-      .where('inv.project_id = :projectId', { projectId })
-      .andWhere('inv.status = :status', { status: 'PAID' })
-      .getRawOne();
+    // 1. Get Revenue (Paid Milestones from Contract)
+    const revRaw = await this.dataSource
+      .query(`
+        SELECT COALESCE(SUM(m.amount), 0) as "totalRevenue"
+        FROM sls_contract_milestones m
+        JOIN sls_contracts c ON c.id = m.contract_id
+        JOIN prj_projects p ON p.contract_id = c.id
+        WHERE p.id = $1 AND m.status = 'PAID'
+      `, [projectId]);
+    
+    const totalRevenue = Number(revRaw[0]?.totalRevenue || 0);
 
     // 2. Get Logged Hours (Approved Timesheets)
-    const { totalHours } = await this.dataSource
+    const hoursRaw = await this.dataSource
       .getRepository(Timesheet)
       .createQueryBuilder('tms')
-      .innerJoin('prj_tasks', 'task', 'task.id = tms.task_id')
-      .select('SUM(tms.logged_hours)', 'totalHours')
+      .innerJoin('prj_tasks', 'task', 'task.id = tms.task_id AND task.deleted_at IS NULL')
+      .select('COALESCE(SUM(tms.logged_hours), 0)', 'totalHours')
       .where('task.project_id = :projectId', { projectId })
-      .andWhere('tms.approval_status = :status', { status: 'Approved' })
+      .andWhere('tms.approval_status = :status', { status: 'APPROVED' }) // Case sensitive match in DB
+      .andWhere('tms.deleted_at IS NULL')
       .getRawOne();
 
     // 3. Get Vendor Costs
-    const { totalVendorCosts } = await this.dataSource
+    const costsRaw = await this.dataSource
       .getRepository(VendorDebt)
       .createQueryBuilder('debt')
-      .innerJoin('tms_timesheets', 'tms', 'tms.id = debt.timesheet_id')
-      .innerJoin('prj_tasks', 'task', 'task.id = tms.task_id')
-      .select('SUM(debt.amount)', 'totalVendorCosts')
+      .innerJoin('tms_timesheets', 'tms', 'tms.id = debt.timesheet_id AND tms.deleted_at IS NULL')
+      .innerJoin('prj_tasks', 'task', 'task.id = tms.task_id AND task.deleted_at IS NULL')
+      .select('COALESCE(SUM(debt.amount), 0)', 'totalVendorCosts')
       .where('task.project_id = :projectId', { projectId })
+      .andWhere('debt.deleted_at IS NULL')
       .getRawOne();
 
-    const revenue = parseFloat(totalRevenue || '0');
-    const hours = parseFloat(totalHours || '0');
-    const vendorCosts = parseFloat(totalVendorCosts || '0');
+    const revenue = totalRevenue;
+    const hours = Number(hoursRaw.totalHours || 0);
+    const vendorCosts = Number(costsRaw.totalVendorCosts || 0);
     
-    // Abstracted internal cost (could be more complex per employee)
-    const internalHourlyRate = 25; // Default for now
+    // Abstracted labor internal cost (e.g. 150k/h for internal staff)
+    const laborCostPerH = 150000;
+    const internalLaborCosts = hours * laborCostPerH;
     
-    // Choose Strategy (Assume Title contains type for now, or add a field)
+    // Choose Strategy
     let strategy: IPnLCalculationStrategy = this.fixedPriceStrategy;
-    if (project.name.toLowerCase().includes('tm') || project.name.toLowerCase().includes('time')) {
+    if (project.name.toLowerCase().includes('tm')) {
       strategy = this.tmStrategy;
     }
 
     const pnl = strategy.calculate(
-      revenue || project.quotation.totalAmount, 
+      revenue || Number(project.quotation.totalAmount), 
       hours, 
-      50, // Billable Rate / Project Rate
+      1, // Rate multiplier
       vendorCosts,
-      internalHourlyRate
+      laborCostPerH
     );
 
     return {
-      revenue: revenue || project.quotation.totalAmount,
+      revenue: revenue || Number(project.quotation.totalAmount),
       hours,
       vendorCosts,
-      internalCosts: hours * internalHourlyRate,
+      internalCosts: internalLaborCosts,
+      totalCosts: vendorCosts + internalLaborCosts,
       profit: pnl,
-      margin: pnl / (revenue || project.quotation.totalAmount),
+      margin: (revenue || Number(project.quotation.totalAmount)) > 0 ? pnl / (revenue || Number(project.quotation.totalAmount)) : 0,
     };
+  }
+
+  async calculateAllProjectsPNL() {
+    const projects = await this.projectRepository.find();
+    const results = [];
+    for (const p of projects) {
+       try {
+          const res = await this.calculateProjectPNL(p.id);
+          results.push({
+             projectId: p.id,
+             projectName: p.name,
+             ...res
+          });
+       } catch (e) {
+          // Skip projects without quotations/data
+       }
+    }
+    return results;
   }
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Search, 
   Bell, 
@@ -15,6 +16,7 @@ import Modal from './Modal';
 import { getCookie } from '../utils/cookie';
 import { Role } from '../../../iam/entities/role.enum';
 import { api } from '../api';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const Header: React.FC = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -22,6 +24,7 @@ const Header: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const { t, i18n } = useTranslation();
   const [loadingNotifs, setLoadingNotifs] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -56,7 +59,7 @@ const Header: React.FC = () => {
       const res = await api.get('/system/notifications');
       setNotifications(Array.isArray(res) ? res : []);
     } catch (err) {
-      console.error('Lỗi khi tải thông báo:', err);
+      console.error(t('common.error_loading_notifs'), err);
     } finally {
       setLoadingNotifs(false);
     }
@@ -67,7 +70,7 @@ const Header: React.FC = () => {
       await api.patch(`/system/notifications/${id}/read`);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (err) {
-      console.error('Lỗi khi đánh dấu đã đọc:', err);
+      console.error(t('common.error_update'), err);
     }
   };
 
@@ -75,12 +78,12 @@ const Header: React.FC = () => {
 
   const getJobTitle = (role: string) => {
     switch (role) {
-      case Role.CEO: return 'Tổng Giám đốc (CEO)';
-      case Role.PM: return 'Quản lý Dự án (PM)';
-      case Role.SALE: return 'Trưởng phòng Kinh doanh';
-      case Role.CLIENT: return 'Đại diện Đối tác';
-      case Role.VENDOR: return 'Đối tác / Lập trình viên (VENDOR/DEV)';
-      default: return 'Thành viên hệ thống';
+      case Role.CEO: return t('sidebar.dashboard_ceo');
+      case Role.PM: return t('sidebar.dashboard_pm');
+      case Role.SALE: return t('sidebar.dashboard_sale');
+      case Role.CLIENT: return t('sidebar.dashboard_client');
+      case Role.VENDOR: return t('sidebar.dashboard_vendor');
+      default: return t('common.user');
     }
   };
 
@@ -88,12 +91,12 @@ const Header: React.FC = () => {
 
   return (
     <header className="h-20 bg-bg-card border-b border-border-primary flex items-center justify-between px-8 z-10 sticky top-0 shrink-0">
-      <Modal isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} title="Trung tâm Thông báo">
+      <Modal isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} title={t('common.notif_center')}>
          <div className="space-y-4">
             {loadingNotifs && notifications.length === 0 ? (
                <div className="flex justify-center py-10"><Loader2 className="w-8 h-8 text-accent-blue animate-spin" /></div>
             ) : notifications.length === 0 ? (
-               <div className="text-center py-10 text-sm text-text-secondary italic">Không có thông báo mới nào</div>
+               <div className="text-center py-10 text-sm text-text-secondary italic">{t('common.notif_none')}</div>
             ) : (
                notifications.map(n => (
                 <div 
@@ -109,7 +112,7 @@ const Header: React.FC = () => {
                    <div className="flex-1">
                       <p className="text-sm font-bold text-text-primary">{n.title}</p>
                       <p className="text-xs text-text-secondary mt-1">{n.message}</p>
-                      <p className="text-[9px] text-text-secondary mt-2 font-black uppercase tracking-widest opacity-60 italic">{new Date(n.createdAt).toLocaleString('vi-VN')}</p>
+                      <p className="text-[9px] text-text-secondary mt-2 font-black uppercase tracking-widest opacity-60 italic">{new Date(n.createdAt).toLocaleString(i18n.language === 'en' ? 'en-US' : 'vi-VN')}</p>
                    </div>
                    {!n.isRead && <div className="w-2 h-2 bg-accent-blue rounded-full mt-2"></div>}
                 </div>
@@ -118,20 +121,20 @@ const Header: React.FC = () => {
          </div>
       </Modal>
 
-      <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Cài đặt Hệ thống">
+      <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title={t('common.settings')}>
          {/* Settings content same as before */}
          <div className="space-y-6">
             <div className="space-y-2">
-               <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">Tài khoản & Bảo mật</p>
+               <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">{t('common.account_security')}</p>
                <div className="p-4 bg-bg-surface rounded-2xl border border-border-primary flex items-center justify-between">
-                  <span className="text-sm text-text-primary">Đổi mật khẩu</span>
-                  <button className="text-xs text-accent-blue font-bold">CẬP NHẬT</button>
+                  <span className="text-sm text-text-primary">{t('common.change_password')}</span>
+                  <button className="text-xs text-accent-blue font-bold tracking-widest uppercase">{t('common.update')}</button>
                </div>
             </div>
             <div className="space-y-2">
-               <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">Tùy chỉnh Giao diện</p>
+               <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">{t('common.appearance')}</p>
                <div className="p-4 bg-bg-surface rounded-2xl border border-border-primary flex items-center justify-between">
-                  <span className="text-sm text-text-primary">{isDarkMode ? 'Chế độ tối (Dark Mode)' : 'Chế độ sáng (Light Mode)'}</span>
+                  <span className="text-sm text-text-primary">{isDarkMode ? t('common.dark_mode') : t('common.light_mode')}</span>
                   <button 
                     onClick={toggleDarkMode}
                     className={`w-12 h-6 ${isDarkMode ? 'bg-accent-blue' : 'bg-slate-400'} rounded-full relative transition-all duration-300 shadow-inner`}
@@ -152,12 +155,13 @@ const Header: React.FC = () => {
           <Search className="w-4 h-4 text-text-secondary group-focus-within:text-accent-blue transition-colors" />
           <input 
             type="text" 
-            placeholder="Tìm kiếm chiến lược, dự án..." 
+            placeholder={t('common.search')}
             className="bg-transparent border-none outline-none text-sm w-full text-text-primary placeholder:text-text-secondary font-medium"
           />
         </div>
 
         <div className="flex items-center gap-4">
+          <LanguageSwitcher />
           <button 
             onClick={() => setIsNotifOpen(true)}
             className="p-2.5 rounded-xl bg-bg-surface text-text-secondary hover:text-white transition-all relative group overflow-hidden"
@@ -174,7 +178,7 @@ const Header: React.FC = () => {
             >
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold text-white group-hover:text-accent-blue transition-all line-clamp-1">{user?.fullName || 'Guest User'}</p>
-                <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest opacity-70">{user ? getJobTitle(user.role) : 'Đang tải...'}</p>
+                <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest opacity-70">{user ? getJobTitle(user.role) : t('common.loading')}</p>
               </div>
               <div className={`w-10 h-10 ${user?.role === Role.CEO ? 'bg-amber-400' : 'bg-accent-blue'} rounded-xl flex items-center justify-center border-2 border-bg-surface ring-2 ring-slate-700/50 group-hover:ring-accent-blue transition-all overflow-hidden shadow-lg shadow-amber-500/10`}>
                 {user?.avatar ? (
@@ -192,7 +196,7 @@ const Header: React.FC = () => {
                 <div className="absolute top-[calc(100%+16px)] right-0 w-64 bg-bg-card border border-border-primary rounded-2xl shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 fade-in duration-200">
                    <div className="p-4 border-b border-border-primary sm:hidden">
                       <p className="text-sm font-bold text-white">{user?.fullName || 'Guest User'}</p>
-                      <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest mt-1 opacity-70">{user ? getJobTitle(user.role) : 'Đang tải...'}</p>
+                      <p className="text-[10px] text-text-secondary font-black uppercase tracking-widest mt-1 opacity-70">{user ? getJobTitle(user.role) : t('common.loading')}</p>
                    </div>
                    <div className="p-2 space-y-1">
                       <button 
@@ -200,7 +204,7 @@ const Header: React.FC = () => {
                         className="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:text-white hover:bg-slate-700/50 w-full transition-all text-left group"
                       >
                         <Settings className="w-4 h-4 group-hover:rotate-45 transition-transform" />
-                        <span className="font-bold text-sm tracking-tight text-white/90">Cài đặt Hệ thống</span>
+                        <span className="font-bold text-sm tracking-tight text-white/90">{t('common.settings')}</span>
                       </button>
                    </div>
                    <div className="p-2 border-t border-border-primary">
@@ -213,7 +217,7 @@ const Header: React.FC = () => {
                         className="flex items-center gap-3 px-4 py-3 rounded-xl text-status-red hover:bg-status-red/10 w-full transition-all group text-left"
                       >
                         <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-bold text-sm tracking-tight">Đăng xuất</span>
+                        <span className="font-bold text-sm tracking-tight">{t('common.logout')}</span>
                       </button>
                    </div>
                 </div>
